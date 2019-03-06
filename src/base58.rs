@@ -1,0 +1,547 @@
+use std::num::Wrapping;
+use std::fmt;
+use std::fmt::Display;
+#[cfg(feature = "check")] use keccak_hash::keccak_256;
+
+/// Base58 alphabet
+pub const BASE58_CHARS: &'static [u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+/// Resulted block size given a [0..8] bytes block
+pub const ENCODED_BLOCK_SIZES: [usize; 9] = [0, 2, 3, 5, 6, 7, 9, 10, 11];
+/// Size of block to encode
+pub const FULL_BLOCK_SIZE: usize = 8;
+/// Size of an encoded 8 bytes block
+pub const FULL_ENCODED_BLOCK_SIZE: usize = ENCODED_BLOCK_SIZES[FULL_BLOCK_SIZE];
+
+/// Possible errors when encoding/decoding base58 and base58-check strings.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Error {
+    /// Invalid block size, must be 1...8
+    InvalidBlockSize,
+    /// Symbol is not present in base58 alphabet
+    InvalidSymbol,
+    /// Invalid 4-bytes checksum
+    InvalidChecksum,
+    /// Computation overflow
+    Overflow,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::InvalidBlockSize => write!(f, "Wrong block size"),
+            Error::InvalidSymbol => write!(f, "Invalid symbol"),
+            Error::InvalidChecksum=> write!(f, "Invalid checksum"),
+            Error::Overflow => write!(f, "Overflow"),
+        }
+    }
+}
+
+fn u8be_to_u64(data: &[u8]) -> u64 {
+    let mut res = 0u64;
+    for b in data {
+        res = res << 8 | *b as u64;
+    }
+    res
+}
+
+fn encode_block(data: &[u8]) -> Result<[char; FULL_ENCODED_BLOCK_SIZE], Error> {
+    if data.len() < 1 && data.len() > FULL_BLOCK_SIZE {
+        return Err(Error::InvalidBlockSize);
+    }
+    let mut res = ['1'; FULL_ENCODED_BLOCK_SIZE];
+    let mut num = u8be_to_u64(data);
+    let mut i = ENCODED_BLOCK_SIZES[data.len()];
+    while i > 0 {
+        let remainder: usize = (num % BASE58_CHARS.len() as u64) as usize;
+        num /= BASE58_CHARS.len() as u64;
+        i = i - 1;
+        res[i] = BASE58_CHARS[remainder] as char;
+    }
+    Ok(res)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct DecodedBlock {
+    data: [u8; FULL_BLOCK_SIZE],
+    size: usize,
+}
+
+fn decode_block(data: &[u8]) -> Result<DecodedBlock, Error> {
+    if data.len() < 1 && data.len() > FULL_ENCODED_BLOCK_SIZE {
+        return Err(Error::InvalidBlockSize);
+    }
+    let res_size = match ENCODED_BLOCK_SIZES.iter().position(|&x| x == data.len()) {
+        Some(size) => size,
+        None => { return Err(Error::InvalidBlockSize) },
+    };
+
+    let alpha: Vec<_> = Vec::from(BASE58_CHARS);
+    let mut res: u128 = 0;
+    let mut order = Wrapping(1);
+    data.iter()
+        .rev()
+        .try_for_each(|&c| {
+            match alpha.iter().position(|&x| x == c) {
+                Some(digit) => {
+                    res = order.0 * digit as u128 + res;
+                    order = order * Wrapping(58);
+                    Ok(())
+                },
+                None => Err(Error::InvalidSymbol),
+            }
+        })?;
+
+    let max: u128 = match res_size {
+        8 => std::u64::MAX as u128 + 1,
+        0..=7 => 1 << (res_size * 8),
+        _ => { return Err(Error::Overflow); },
+    };
+
+    let data = match (res as u128) < max {
+        true => (res as u64).to_be_bytes(),
+        false => { return Err(Error::Overflow); },
+    };
+
+    Ok(DecodedBlock { data, size: res_size })
+}
+
+/// Encode a byte vector into a base58-encoded string
+pub fn encode(data: &[u8]) -> Result<String, Error> {
+    let last_block_size = ENCODED_BLOCK_SIZES[data.len() % FULL_BLOCK_SIZE];
+    let full_block_count = data.len() / FULL_BLOCK_SIZE;
+    let data: Result<Vec<[char; FULL_ENCODED_BLOCK_SIZE]>, Error> = data
+        .chunks(FULL_BLOCK_SIZE)
+        .map(|c| encode_block(c))
+        .collect();
+
+    let mut i = 0;
+    let mut res: Vec<char> = Vec::new();
+    data?.into_iter()
+        .for_each(|v| {
+            if i == full_block_count {
+                res.extend_from_slice(&v[0..last_block_size]);
+            } else {
+                res.extend_from_slice(&v);
+            }
+            i = i + 1;
+        });
+
+    let s: String = res.into_iter().collect();
+    Ok(s)
+}
+
+/// Encode a byte vector into a base58-check string, adds 4 bytes checksum
+#[cfg(feature = "check")]
+pub fn encode_check(data: &[u8]) -> Result<String, Error> {
+    let mut bytes = Vec::from(data);
+    let mut checksum = [0u8; 32];
+    keccak_256(&bytes[..], &mut checksum);
+    bytes.extend_from_slice(&checksum[0..4]);
+    encode(&bytes[..])
+}
+
+/// Decode base58-encoded string into a byte vector
+pub fn decode(data: &str) -> Result<Vec<u8>, Error> {
+    let data: Result<Vec<DecodedBlock>, Error> = data.as_bytes()
+        .chunks(FULL_ENCODED_BLOCK_SIZE)
+        .map(|c| decode_block(c))
+        .collect();
+    let mut res = Vec::new();
+    data?.into_iter()
+        .for_each(|c| {
+            let bytes = &c.data[8-c.size..];
+            res.extend_from_slice(bytes);
+        });
+    Ok(res)
+}
+
+/// Decode base58-encoded with 4 bytes checksum string into a byte vector
+#[cfg(feature = "check")]
+pub fn decode_check(data: &str) -> Result<Vec<u8>, Error> {
+    let bytes = decode(data)?;
+    let (bytes, checksum) = {
+        let len = bytes.len();
+        (&bytes[..len-4], &bytes[len-4..len])
+    };
+    let mut check = [0u8; 32];
+    keccak_256(&bytes[..], &mut check);
+    match &check[..4] == checksum {
+        true => Ok(Vec::from(bytes)),
+        false => Err(Error::InvalidChecksum),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate hex;
+    #[cfg(feature = "check")] use super::{encode_check, decode_check};
+    use super::{u8be_to_u64, encode_block, encode, decode_block, decode, Error, ENCODED_BLOCK_SIZES};
+
+    macro_rules! uint_8be_to_64 {
+        ($expected:expr, $string:expr) => {
+            assert_eq!($expected, u8be_to_u64($string));
+        };
+    }
+
+    #[test]
+    fn test_u8be_to_u64() {
+        uint_8be_to_64!(0x0000000000000001, b"\x01");
+        uint_8be_to_64!(0x0000000000000102, b"\x01\x02");
+        uint_8be_to_64!(0x0000000000010203, b"\x01\x02\x03");
+        uint_8be_to_64!(0x0000000001020304, b"\x01\x02\x03\x04");
+        uint_8be_to_64!(0x0000000102030405, b"\x01\x02\x03\x04\x05");
+        uint_8be_to_64!(0x0000010203040506, b"\x01\x02\x03\x04\x05\x06");
+        uint_8be_to_64!(0x0001020304050607, b"\x01\x02\x03\x04\x05\x06\x07");
+        uint_8be_to_64!(0x0102030405060708, b"\x01\x02\x03\x04\x05\x06\x07\x08");
+    }
+
+    macro_rules! encode_block {
+        ($block:expr, $expected:expr) => {
+            let chars = $expected.chars().collect::<Vec<_>>();
+            let res = &encode_block($block).unwrap()[..ENCODED_BLOCK_SIZES[$block.len()]];
+            assert_eq!(chars, res);
+        };
+    }
+
+    #[test]
+    fn test_base58_encode_block() {
+        encode_block!(b"\x00",                             "11");
+        encode_block!(b"\x39",                             "1z");
+        encode_block!(b"\xFF",                             "5Q");
+
+        encode_block!(b"\x00\x00",                         "111");
+        encode_block!(b"\x00\x39",                         "11z");
+        encode_block!(b"\x01\x00",                         "15R");
+        encode_block!(b"\xFF\xFF",                         "LUv");
+
+        encode_block!(b"\x00\x00\x00",                     "11111");
+        encode_block!(b"\x00\x00\x39",                     "1111z");
+        encode_block!(b"\x01\x00\x00",                     "11LUw");
+        encode_block!(b"\xFF\xFF\xFF",                     "2UzHL");
+
+        encode_block!(b"\x00\x00\x00\x39",                 "11111z");
+        encode_block!(b"\xFF\xFF\xFF\xFF",                 "7YXq9G");
+        encode_block!(b"\x00\x00\x00\x00\x39",             "111111z");
+        encode_block!(b"\xFF\xFF\xFF\xFF\xFF",             "VtB5VXc");
+        encode_block!(b"\x00\x00\x00\x00\x00\x39",         "11111111z");
+        encode_block!(b"\xFF\xFF\xFF\xFF\xFF\xFF",         "3CUsUpv9t");
+        encode_block!(b"\x00\x00\x00\x00\x00\x00\x39",     "111111111z");
+        encode_block!(b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF",     "Ahg1opVcGW");
+        encode_block!(b"\x00\x00\x00\x00\x00\x00\x00\x39", "1111111111z");
+        encode_block!(b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF", "jpXCZedGfVQ");
+
+        encode_block!(b"\x00\x00\x00\x00\x00\x00\x00\x00", "11111111111");
+        encode_block!(b"\x00\x00\x00\x00\x00\x00\x00\x01", "11111111112");
+        encode_block!(b"\x00\x00\x00\x00\x00\x00\x00\x08", "11111111119");
+        encode_block!(b"\x00\x00\x00\x00\x00\x00\x00\x09", "1111111111A");
+        encode_block!(b"\x00\x00\x00\x00\x00\x00\x00\x3A", "11111111121");
+        encode_block!(b"\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF", "1Ahg1opVcGW");
+        encode_block!(b"\x06\x15\x60\x13\x76\x28\x79\xF7", "22222222222");
+        encode_block!(b"\x05\xE0\x22\xBA\x37\x4B\x2A\x00", "1z111111111");
+    }
+
+    macro_rules! decode_block_pos {
+        ($enc:expr, $expected:expr) => {
+            let res = decode_block($enc).unwrap();
+            assert_eq!(&$expected[..], &res.data[8-res.size..]);
+        };
+    }
+
+    macro_rules! decode_block_neg {
+        ($enc:expr, $expected:expr) => {
+            assert_eq!(Err($expected), decode_block($enc));
+        };
+    }
+
+    #[test]
+    fn test_base58_decode_block() {
+        // 1-byte block
+        decode_block_neg!(b"1",           Error::InvalidBlockSize);
+        decode_block_neg!(b"z",           Error::InvalidBlockSize);
+        // 2-byte block
+        decode_block_pos!(b"11",          b"\x00");
+        decode_block_pos!(b"5Q",          b"\xFF");
+        decode_block_neg!(b"5R",          Error::Overflow);
+        decode_block_neg!(b"zz",          Error::Overflow);
+        // 3-bytes block
+        decode_block_pos!(b"111",         b"\x00\x00");
+        decode_block_pos!(b"LUv",         b"\xFF\xFF");
+        decode_block_neg!(b"LUw",         Error::Overflow);
+        decode_block_neg!(b"zzz",         Error::Overflow);
+        // 4-bytes block
+        decode_block_neg!(b"1111",        Error::InvalidBlockSize);
+        decode_block_neg!(b"zzzz",        Error::InvalidBlockSize);
+        // 5-bytes block
+        decode_block_pos!(b"11111",       b"\x00\x00\x00");
+        decode_block_pos!(b"2UzHL",       b"\xFF\xFF\xFF");
+        decode_block_neg!(b"2UzHM",       Error::Overflow);
+        decode_block_neg!(b"zzzzz",       Error::Overflow);
+        // 6-bytes block
+        decode_block_pos!(b"111111",      b"\x00\x00\x00\x00");
+        decode_block_pos!(b"7YXq9G",      b"\xFF\xFF\xFF\xFF");
+        decode_block_neg!(b"7YXq9H",      Error::Overflow);
+        decode_block_neg!(b"zzzzzz",      Error::Overflow);
+        // 7-bytes block
+        decode_block_pos!(b"1111111",     b"\x00\x00\x00\x00\x00");
+        decode_block_pos!(b"VtB5VXc",     b"\xFF\xFF\xFF\xFF\xFF");
+        decode_block_neg!(b"VtB5VXd",     Error::Overflow);
+        decode_block_neg!(b"zzzzzzz",     Error::Overflow);
+        // 8-bytes block
+        decode_block_neg!(b"11111111",    Error::InvalidBlockSize);
+        decode_block_neg!(b"zzzzzzzz",    Error::InvalidBlockSize);
+        // 9-bytes block
+        decode_block_pos!(b"111111111",   b"\x00\x00\x00\x00\x00\x00");
+        decode_block_pos!(b"3CUsUpv9t",   b"\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_block_neg!(b"3CUsUpv9u",   Error::Overflow);
+        decode_block_neg!(b"zzzzzzzzz",   Error::Overflow);
+        // 10-bytes block
+        decode_block_pos!(b"1111111111",  b"\x00\x00\x00\x00\x00\x00\x00");
+        decode_block_pos!(b"Ahg1opVcGW",  b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_block_neg!(b"Ahg1opVcGX",  Error::Overflow);
+        decode_block_neg!(b"zzzzzzzzzz",  Error::Overflow);
+        // 11-bytes block
+        decode_block_pos!(b"11111111111", b"\x00\x00\x00\x00\x00\x00\x00\x00");
+        decode_block_pos!(b"jpXCZedGfVQ", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_block_neg!(b"jpXCZedGfVR", Error::Overflow);
+        decode_block_neg!(b"zzzzzzzzzzz", Error::Overflow);
+        // Invalid symbolsb"
+        decode_block_neg!(b"01111111111", Error::InvalidSymbol);
+        decode_block_neg!(b"11111111110", Error::InvalidSymbol);
+        decode_block_neg!(b"11111011111", Error::InvalidSymbol);
+        decode_block_neg!(b"I1111111111", Error::InvalidSymbol);
+        decode_block_neg!(b"O1111111111", Error::InvalidSymbol);
+        decode_block_neg!(b"l1111111111", Error::InvalidSymbol);
+        decode_block_neg!(b"_1111111111", Error::InvalidSymbol);
+    }
+
+    macro_rules! encode {
+        ($expected:expr, $data:expr) => {
+            assert_eq!(Ok(String::from($expected)), encode($data));
+        };
+    }
+
+    #[test]
+    fn test_base58_encode() {
+        encode!("11",                     b"\x00");
+        encode!("111",                    b"\x00\x00");
+        encode!("11111",                  b"\x00\x00\x00");
+        encode!("111111",                 b"\x00\x00\x00\x00");
+        encode!("1111111",                b"\x00\x00\x00\x00\x00");
+        encode!("111111111",              b"\x00\x00\x00\x00\x00\x00");
+        encode!("1111111111",             b"\x00\x00\x00\x00\x00\x00\x00");
+        encode!("11111111111",            b"\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("1111111111111",          b"\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("11111111111111",         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("1111111111111111",       b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("11111111111111111",      b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("111111111111111111",     b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("11111111111111111111",   b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("111111111111111111111",  b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("1111111111111111111111", b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
+        encode!("22222222222VtB5VXc",     b"\x06\x15\x60\x13\x76\x28\x79\xF7\xFF\xFF\xFF\xFF\xFF");
+    }
+
+    macro_rules! decode_pos {
+        ($enc:expr, $expected:expr) => {
+            assert_eq!(Ok(Vec::from(&$expected[..])), decode($enc));
+        };
+    }
+
+    macro_rules! decode_neg {
+        ($expected:expr, $enc:expr) => {
+            assert_eq!(Err($expected), decode($enc));
+        };
+    }
+
+    #[test]
+    fn test_base58_decode() {
+        decode_pos!("",                       b"");
+        decode_pos!("5Q",                     b"\xFF");
+        decode_pos!("LUv",                    b"\xFF\xFF");
+        decode_pos!("2UzHL",                  b"\xFF\xFF\xFF");
+        decode_pos!("7YXq9G",                 b"\xFF\xFF\xFF\xFF");
+        decode_pos!("VtB5VXc",                b"\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("3CUsUpv9t",              b"\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("Ahg1opVcGW",             b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQ",            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQ5Q",          b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQLUv",         b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQ2UzHL",       b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQ7YXq9G",      b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQVtB5VXc",     b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQ3CUsUpv9t",   b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQAhg1opVcGW",  b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_pos!("jpXCZedGfVQjpXCZedGfVQ", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        // Invalid length
+        decode_neg!(Error::InvalidBlockSize, "1");
+        decode_neg!(Error::InvalidBlockSize, "z");
+        decode_neg!(Error::InvalidBlockSize, "1111");
+        decode_neg!(Error::InvalidBlockSize, "zzzz");
+        decode_neg!(Error::InvalidBlockSize, "11111111");
+        decode_neg!(Error::InvalidBlockSize, "zzzzzzzz");
+        decode_neg!(Error::InvalidBlockSize, "123456789AB1");
+        decode_neg!(Error::InvalidBlockSize, "123456789ABz");
+        decode_neg!(Error::InvalidBlockSize, "123456789AB1111");
+        decode_neg!(Error::InvalidBlockSize, "123456789ABzzzz");
+        decode_neg!(Error::InvalidBlockSize, "123456789AB11111111");
+        decode_neg!(Error::InvalidBlockSize, "123456789ABzzzzzzzz");
+        // Overflow
+        decode_neg!(Error::Overflow, "5R");
+        decode_neg!(Error::Overflow, "zz");
+        decode_neg!(Error::Overflow, "LUw");
+        decode_neg!(Error::Overflow, "zzz");
+        decode_neg!(Error::Overflow, "2UzHM");
+        decode_neg!(Error::Overflow, "zzzzz");
+        decode_neg!(Error::Overflow, "7YXq9H");
+        decode_neg!(Error::Overflow, "zzzzzz");
+        decode_neg!(Error::Overflow, "VtB5VXd");
+        decode_neg!(Error::Overflow, "zzzzzzz");
+        decode_neg!(Error::Overflow, "3CUsUpv9u");
+        decode_neg!(Error::Overflow, "zzzzzzzzz");
+        decode_neg!(Error::Overflow, "Ahg1opVcGX");
+        decode_neg!(Error::Overflow, "zzzzzzzzzz");
+        decode_neg!(Error::Overflow, "jpXCZedGfVR");
+        decode_neg!(Error::Overflow, "zzzzzzzzzzz");
+        decode_neg!(Error::Overflow, "123456789AB5R");
+        decode_neg!(Error::Overflow, "123456789ABzz");
+        decode_neg!(Error::Overflow, "123456789ABLUw");
+        decode_neg!(Error::Overflow, "123456789ABzzz");
+        decode_neg!(Error::Overflow, "123456789AB2UzHM");
+        decode_neg!(Error::Overflow, "123456789ABzzzzz");
+        decode_neg!(Error::Overflow, "123456789AB7YXq9H");
+        decode_neg!(Error::Overflow, "123456789ABzzzzzz");
+        decode_neg!(Error::Overflow, "123456789ABVtB5VXd");
+        decode_neg!(Error::Overflow, "123456789ABzzzzzzz");
+        decode_neg!(Error::Overflow, "123456789AB3CUsUpv9u");
+        decode_neg!(Error::Overflow, "123456789ABzzzzzzzzz");
+        decode_neg!(Error::Overflow, "123456789ABAhg1opVcGX");
+        decode_neg!(Error::Overflow, "123456789ABzzzzzzzzzz");
+        decode_neg!(Error::Overflow, "123456789ABjpXCZedGfVR");
+        decode_neg!(Error::Overflow, "123456789ABzzzzzzzzzzz");
+        decode_neg!(Error::Overflow, "zzzzzzzzzzz11");
+        // Invalid symbols
+        decode_neg!(Error::InvalidSymbol, "10");
+        decode_neg!(Error::InvalidSymbol, "11I");
+        decode_neg!(Error::InvalidSymbol, "11O11");
+        decode_neg!(Error::InvalidSymbol, "11l111");
+        decode_neg!(Error::InvalidSymbol, "11_11111111");
+        decode_neg!(Error::InvalidSymbol, "1101111111111");
+        decode_neg!(Error::InvalidSymbol, "11I11111111111111");
+        decode_neg!(Error::InvalidSymbol, "11O1111111111111111111");
+        decode_neg!(Error::InvalidSymbol, "1111111111110");
+        decode_neg!(Error::InvalidSymbol, "111111111111l1111");
+        decode_neg!(Error::InvalidSymbol, "111111111111_111111111");
+    }
+
+    macro_rules! encode_address {
+        ($expected:expr, $hex:expr, $func:expr) => {
+            let hex = hex::decode($hex).unwrap();
+            assert_eq!(Ok(String::from($expected)), $func(&hex[..]));
+        };
+    }
+
+    #[test]
+    fn test_base58_encode_address() {
+        encode_address!(
+            "4Au2dGq2uFHWapfkU1RF4X6tFdY1rKtNfJrfsNSUinrRK3d8ZBViLtz5NGQiBM1xM5LeD4ak5Q2869PfC7hUWuDA5RzvSk5",
+            "12f4bd0587c43594b0ddb2ef4e616d24232d14eee07f45b46ac19ef3b11e7c7e6be2a59b6284ad5b1a1b43051d07e788756dcfff36008637322a1c975eeb6149274647451e",
+            encode
+        );
+        encode_address!(
+            "47Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            "1298a05f07a0c9f94da6e0bb1ebe819748ab787e95b72f6157555d2fa45644e076319c740890b4f86fdbe5528942af2c52c6810b6c9773d903437c090d99b397070ee1d7d1",
+            encode
+        );
+        encode_address!(
+            "46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLVDjTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            "1284c19bf4557a66aaa18f2af53814d694a7ccf0c6a245bcb10546ea40f6e261a8b6a587843c6943beeba8f386547f53e332bcef66bfee04de027879b51ec5fbe9b5f398bf",
+            encode
+        );
+        encode_address!(
+            "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            "128916f019baad1f65e2eb2deae8af83045d7be1accf57034fb2b23b72a4cf023a9429b5ffcaf9daf1f4d5e3c85906aefc554f15e95956c185e60e5521cb71b8b681a61491",
+            encode
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "check")]
+    fn test_base58_encode_check() {
+        encode_address!(
+            "4Au2dGq2uFHWapfkU1RF4X6tFdY1rKtNfJrfsNSUinrRK3d8ZBViLtz5NGQiBM1xM5LeD4ak5Q2869PfC7hUWuDA5RzvSk5",
+            "12f4bd0587c43594b0ddb2ef4e616d24232d14eee07f45b46ac19ef3b11e7c7e6be2a59b6284ad5b1a1b43051d07e788756dcfff36008637322a1c975eeb614927",
+            encode_check
+        );
+        encode_address!(
+            "47Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            "1298a05f07a0c9f94da6e0bb1ebe819748ab787e95b72f6157555d2fa45644e076319c740890b4f86fdbe5528942af2c52c6810b6c9773d903437c090d99b39707",
+            encode_check
+        );
+        encode_address!(
+            "46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLVDjTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            "1284c19bf4557a66aaa18f2af53814d694a7ccf0c6a245bcb10546ea40f6e261a8b6a587843c6943beeba8f386547f53e332bcef66bfee04de027879b51ec5fbe9",
+            encode_check
+        );
+        encode_address!(
+            "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            "128916f019baad1f65e2eb2deae8af83045d7be1accf57034fb2b23b72a4cf023a9429b5ffcaf9daf1f4d5e3c85906aefc554f15e95956c185e60e5521cb71b8b6",
+            encode_check
+        );
+    }
+
+    macro_rules! decode_address {
+        ($expected:expr, $addr:expr, $func:expr) => {
+            let hex = hex::decode($expected).unwrap();
+            assert_eq!(Ok(hex), $func($addr));
+        };
+    }
+
+    #[test]
+    fn test_base58_decode_address() {
+        decode_address!(
+            "12f4bd0587c43594b0ddb2ef4e616d24232d14eee07f45b46ac19ef3b11e7c7e6be2a59b6284ad5b1a1b43051d07e788756dcfff36008637322a1c975eeb6149274647451e",
+            "4Au2dGq2uFHWapfkU1RF4X6tFdY1rKtNfJrfsNSUinrRK3d8ZBViLtz5NGQiBM1xM5LeD4ak5Q2869PfC7hUWuDA5RzvSk5",
+            decode
+        );
+        decode_address!(
+            "1298a05f07a0c9f94da6e0bb1ebe819748ab787e95b72f6157555d2fa45644e076319c740890b4f86fdbe5528942af2c52c6810b6c9773d903437c090d99b397070ee1d7d1",
+            "47Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            decode
+        );
+        decode_address!(
+            "1284c19bf4557a66aaa18f2af53814d694a7ccf0c6a245bcb10546ea40f6e261a8b6a587843c6943beeba8f386547f53e332bcef66bfee04de027879b51ec5fbe9b5f398bf",
+            "46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLVDjTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            decode
+        );
+        decode_address!(
+            "128916f019baad1f65e2eb2deae8af83045d7be1accf57034fb2b23b72a4cf023a9429b5ffcaf9daf1f4d5e3c85906aefc554f15e95956c185e60e5521cb71b8b681a61491",
+            "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            decode
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "check")]
+    fn test_base58_decode_check() {
+        decode_address!(
+            "12f4bd0587c43594b0ddb2ef4e616d24232d14eee07f45b46ac19ef3b11e7c7e6be2a59b6284ad5b1a1b43051d07e788756dcfff36008637322a1c975eeb614927",
+            "4Au2dGq2uFHWapfkU1RF4X6tFdY1rKtNfJrfsNSUinrRK3d8ZBViLtz5NGQiBM1xM5LeD4ak5Q2869PfC7hUWuDA5RzvSk5",
+            decode_check
+        );
+        decode_address!(
+            "1298a05f07a0c9f94da6e0bb1ebe819748ab787e95b72f6157555d2fa45644e076319c740890b4f86fdbe5528942af2c52c6810b6c9773d903437c090d99b39707",
+            "47Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            decode_check
+        );
+        decode_address!(
+            "1284c19bf4557a66aaa18f2af53814d694a7ccf0c6a245bcb10546ea40f6e261a8b6a587843c6943beeba8f386547f53e332bcef66bfee04de027879b51ec5fbe9",
+            "46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLVDjTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            decode_check
+        );
+        decode_address!(
+            "128916f019baad1f65e2eb2deae8af83045d7be1accf57034fb2b23b72a4cf023a9429b5ffcaf9daf1f4d5e3c85906aefc554f15e95956c185e60e5521cb71b8b6",
+            "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            decode_check
+        );
+    }
+}

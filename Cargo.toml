@@ -1,0 +1,15 @@
+[package]
+name = "base58-monero"
+version = "0.1.0"
+authors = ["h4sh3d <h4sh3d@truelevel.io>"]
+edition = "2018"
+
+[features]
+check = ["keccak-hash"]
+default = ["check"]
+
+[dependencies]
+keccak-hash = { version = "0.1", optional = true }
+
+[dev-dependencies]
+hex = "0.3"
