@@ -1,3 +1,5 @@
+[![Documentation](https://docs.rs/base58-monero/badge.svg)](https://docs.rs/base58-monero) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Rust Monero Base58
 ===
 
