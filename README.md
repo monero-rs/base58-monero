@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/monero-rs/base58-monero-rs.svg?branch=master)](https://travis-ci.com/monero-rs/base58-monero-rs) [![Documentation](https://docs.rs/base58-monero/badge.svg)](https://docs.rs/base58-monero) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Crates.io](https://img.shields.io/crates/v/base58-monero.svg)](https://crates.io/crates/base58-monero) [![Build Status](https://travis-ci.com/monero-rs/base58-monero-rs.svg?branch=master)](https://travis-ci.com/monero-rs/base58-monero-rs) [![Documentation](https://docs.rs/base58-monero/badge.svg)](https://docs.rs/base58-monero) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Rust Monero Base58
 ===
