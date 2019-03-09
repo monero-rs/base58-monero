@@ -1,5 +1,5 @@
 use std::num::Wrapping;
-use std::fmt;
+use std::{error, fmt};
 use std::fmt::Display;
 #[cfg(feature = "check")] use keccak_hash::keccak_256;
 
@@ -17,21 +17,35 @@ pub const FULL_ENCODED_BLOCK_SIZE: usize = ENCODED_BLOCK_SIZES[FULL_BLOCK_SIZE];
 pub enum Error {
     /// Invalid block size, must be 1...8
     InvalidBlockSize,
-    /// Symbol is not present in base58 alphabet
+    /// Symbol not in base58 alphabet
     InvalidSymbol,
     /// Invalid 4-bytes checksum
     InvalidChecksum,
-    /// Computation overflow
+    /// Decoding overflow
     Overflow,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::InvalidBlockSize => write!(f, "Wrong block size"),
-            Error::InvalidSymbol => write!(f, "Invalid symbol"),
-            Error::InvalidChecksum=> write!(f, "Invalid checksum"),
-            Error::Overflow => write!(f, "Overflow"),
+            Error::InvalidBlockSize | Error::InvalidSymbol | Error::InvalidChecksum | Error::Overflow => f.write_str(error::Error::description(self)),
+        }
+    }
+}
+
+impl error::Error for Error {
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            Error::InvalidBlockSize | Error::InvalidSymbol | Error::InvalidChecksum | Error::Overflow => None,
+        }
+    }
+
+    fn description(&self) -> &str {
+        match *self {
+            Error::InvalidBlockSize => "invalid block size",
+            Error::InvalidSymbol => "invalid symbol",
+            Error::InvalidChecksum=> "invalid checksum",
+            Error::Overflow => "overflow",
         }
     }
 }

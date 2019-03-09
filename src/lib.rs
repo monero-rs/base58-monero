@@ -10,6 +10,7 @@
 
 #[cfg(feature = "check")] extern crate keccak_hash;
 
+/// Base58 encoder and decoder
 pub mod base58;
 
 pub use base58::encode;
