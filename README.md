@@ -16,6 +16,28 @@ characters; if a particular block converts to `<11` characters, the conversion p
 Due to the conditional padding, the 69-byte string will always convert to 95 Base58 characters
 `(8 * 11 + 7)`; where 7 is length of the last block of 5 bytes.
 
+
+Features
+===
+
+## `check`
+
+Enable `encode_check` and `decode_check` functions. By default `check` feature is enable.
+If you don't want to include `check` in your project import:
+
+```
+[dependencies.base58-monero]
+version = "0.1"
+default-features = false
+```
+
+or
+
+```
+cargo build --no-default-features
+```
+
+
 About
 ===
 
