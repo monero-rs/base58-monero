@@ -6,6 +6,7 @@ version = "0.1.1"
 authors = ["h4sh3d <h4sh3d@truelevel.io>"]
 license-file = "LICENSE"
 documentation = "https://docs.rs/base58-monero"
+homepage = "https://github.com/monero-rs/base58-monero-rs"
 repository = "https://github.com/monero-rs/base58-monero-rs"
 readme = "README.md"
 
