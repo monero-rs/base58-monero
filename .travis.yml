@@ -3,6 +3,9 @@ rust:
   - stable
   - beta
   - nightly
+before_install:
+  - rustup target add wasm32-unknown-unknown
 script:
   - cargo build --verbose
+  - cargo build --verbose --target wasm32-unknown-unknown
   - cargo test --verbose
