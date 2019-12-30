@@ -21,3 +21,6 @@ keccak-hash = { version = "0.1", optional = true }
 
 [dev-dependencies]
 hex = "0.3"
+
+[badges]
+travis-ci = { repository = "monero-rs/base58-monero-rs", branch = "master" }
