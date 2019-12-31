@@ -29,6 +29,8 @@ extern crate keccak_hash;
 /// Base58 encoder and decoder
 pub mod base58;
 
+pub use base58::Result;
+pub use base58::Error;
 pub use base58::decode;
 #[cfg(feature = "check")]
 pub use base58::decode_check;

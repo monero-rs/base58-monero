@@ -69,6 +69,8 @@ impl error::Error for Error {
     }
 }
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 fn u8be_to_u64(data: &[u8]) -> u64 {
     let mut res = 0u64;
     for b in data {
@@ -77,7 +79,7 @@ fn u8be_to_u64(data: &[u8]) -> u64 {
     res
 }
 
-fn encode_block(data: &[u8]) -> Result<[char; FULL_ENCODED_BLOCK_SIZE], Error> {
+fn encode_block(data: &[u8]) -> Result<[char; FULL_ENCODED_BLOCK_SIZE]> {
     if data.is_empty() && data.len() > FULL_BLOCK_SIZE {
         return Err(Error::InvalidBlockSize);
     }
@@ -99,7 +101,7 @@ struct DecodedBlock {
     size: usize,
 }
 
-fn decode_block(data: &[u8]) -> Result<DecodedBlock, Error> {
+fn decode_block(data: &[u8]) -> Result<DecodedBlock> {
     if data.is_empty() && data.len() > FULL_ENCODED_BLOCK_SIZE {
         return Err(Error::InvalidBlockSize);
     }
@@ -143,10 +145,10 @@ fn decode_block(data: &[u8]) -> Result<DecodedBlock, Error> {
 }
 
 /// Encode a byte vector into a base58-encoded string
-pub fn encode(data: &[u8]) -> Result<String, Error> {
+pub fn encode(data: &[u8]) -> Result<String> {
     let last_block_size = ENCODED_BLOCK_SIZES[data.len() % FULL_BLOCK_SIZE];
     let full_block_count = data.len() / FULL_BLOCK_SIZE;
-    let data: Result<Vec<[char; FULL_ENCODED_BLOCK_SIZE]>, Error> = data
+    let data: Result<Vec<[char; FULL_ENCODED_BLOCK_SIZE]>> = data
         .chunks(FULL_BLOCK_SIZE)
         .map(|c| encode_block(c))
         .collect();
@@ -168,7 +170,7 @@ pub fn encode(data: &[u8]) -> Result<String, Error> {
 
 /// Encode a byte vector into a base58-check string, adds 4 bytes checksum
 #[cfg(feature = "check")]
-pub fn encode_check(data: &[u8]) -> Result<String, Error> {
+pub fn encode_check(data: &[u8]) -> Result<String> {
     let mut bytes = Vec::from(data);
     let mut checksum = [0u8; 32];
     keccak_256(&bytes[..], &mut checksum);
@@ -177,8 +179,8 @@ pub fn encode_check(data: &[u8]) -> Result<String, Error> {
 }
 
 /// Decode base58-encoded string into a byte vector
-pub fn decode(data: &str) -> Result<Vec<u8>, Error> {
-    let data: Result<Vec<DecodedBlock>, Error> = data
+pub fn decode(data: &str) -> Result<Vec<u8>> {
+    let data: Result<Vec<DecodedBlock>> = data
         .as_bytes()
         .chunks(FULL_ENCODED_BLOCK_SIZE)
         .map(|c| decode_block(c))
@@ -193,7 +195,7 @@ pub fn decode(data: &str) -> Result<Vec<u8>, Error> {
 
 /// Decode base58-encoded with 4 bytes checksum string into a byte vector
 #[cfg(feature = "check")]
-pub fn decode_check(data: &str) -> Result<Vec<u8>, Error> {
+pub fn decode_check(data: &str) -> Result<Vec<u8>> {
     let bytes = decode(data)?;
     let (bytes, checksum) = {
         let len = bytes.len();
