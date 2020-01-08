@@ -1,6 +1,6 @@
 // Rust Monero Base58 Library
 // Written in 2019 by
-//   h4sh3d <h4sh3d@truelevel.io>
+//   h4sh3d <h4sh3d@protonmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -13,9 +13,22 @@
 // copies or substantial portions of the Software.
 //
 
+#[cfg(feature = "stream")]
+use async_stream::try_stream;
+#[cfg(feature = "stream")]
+use futures_util::pin_mut;
+#[cfg(feature = "stream")]
+use futures_util::stream::StreamExt;
 #[cfg(feature = "check")]
-use keccak_hash::keccak_256;
+use tiny_keccak::{Hasher, Keccak};
+#[cfg(feature = "stream")]
+use tokio::io::AsyncReadExt;
+#[cfg(feature = "stream")]
+use tokio::stream::Stream;
+
 use std::fmt::Display;
+#[cfg(feature = "stream")]
+use std::io;
 use std::num::Wrapping;
 use std::{error, fmt};
 
@@ -27,27 +40,35 @@ pub const ENCODED_BLOCK_SIZES: [usize; 9] = [0, 2, 3, 5, 6, 7, 9, 10, 11];
 pub const FULL_BLOCK_SIZE: usize = 8;
 /// Size of an encoded 8 bytes block
 pub const FULL_ENCODED_BLOCK_SIZE: usize = ENCODED_BLOCK_SIZES[FULL_BLOCK_SIZE];
+/// Size of checksum
+pub const CHECKSUM_SIZE: usize = 4;
 
 /// Possible errors when encoding/decoding base58 and base58-check strings.
-#[derive(PartialEq, Eq)]
 pub enum Error {
     /// Invalid block size, must be 1...8
     InvalidBlockSize,
     /// Symbol not in base58 alphabet
     InvalidSymbol,
+    #[cfg(feature = "check")]
     /// Invalid 4-bytes checksum
     InvalidChecksum,
     /// Decoding overflow
     Overflow,
+    #[cfg(feature = "stream")]
+    /// IO error on stream
+    Io(io::Error),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
+        match self {
             Error::InvalidBlockSize => write!(f, "invalid block size"),
             Error::InvalidSymbol => write!(f, "invalid symbol"),
+            #[cfg(feature = "check")]
             Error::InvalidChecksum => write!(f, "invalid checksum"),
             Error::Overflow => write!(f, "overflow"),
+            #[cfg(feature = "stream")]
+            Error::Io(e) => write!(f, "overflow, {}", e),
         }
     }
 }
@@ -61,11 +82,49 @@ impl fmt::Debug for Error {
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
-            Error::InvalidBlockSize
-            | Error::InvalidSymbol
-            | Error::InvalidChecksum
-            | Error::Overflow => None,
+            Error::InvalidBlockSize | Error::InvalidSymbol | Error::Overflow => None,
+            #[cfg(feature = "check")]
+            Error::InvalidChecksum => None,
+            #[cfg(feature = "stream")]
+            Error::Io(e) => Some(e),
         }
+    }
+}
+
+impl PartialEq for Error {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Error::InvalidBlockSize => match other {
+                Error::InvalidBlockSize => true,
+                _ => false,
+            },
+            Error::InvalidSymbol => match other {
+                Error::InvalidSymbol => true,
+                _ => false,
+            },
+            #[cfg(feature = "check")]
+            Error::InvalidChecksum => match other {
+                Error::InvalidChecksum => true,
+                _ => false,
+            },
+            Error::Overflow => match other {
+                Error::Overflow => true,
+                _ => false,
+            },
+            #[cfg(feature = "stream")]
+            // Ignore what Io error is wrapped
+            Error::Io(_) => match other {
+                Error::Io(_) => true,
+                _ => false,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "stream")]
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::Io(e)
     }
 }
 
@@ -157,7 +216,7 @@ pub fn encode(data: &[u8]) -> Result<String> {
     let mut res: Vec<char> = Vec::new();
     data?.into_iter().for_each(|v| {
         if i == full_block_count {
-            res.extend_from_slice(&v[0..last_block_size]);
+            res.extend_from_slice(&v[..last_block_size]);
         } else {
             res.extend_from_slice(&v);
         }
@@ -168,14 +227,115 @@ pub fn encode(data: &[u8]) -> Result<String> {
     Ok(s)
 }
 
+/// Encdoe a byte stream in a base58 stream of characters
+#[cfg(feature = "stream")]
+pub fn encode_stream<T>(mut data: T) -> impl Stream<Item = Result<char>>
+where
+    T: AsyncReadExt + Unpin,
+{
+    try_stream! {
+        let mut clen = 0;
+        let mut buf = [0; FULL_BLOCK_SIZE];
+
+        loop {
+            let len = data.read(&mut buf[clen..]).await?;
+            clen += len;
+
+            if len == 0 {
+                // EOF reached, final block is created
+                let block_size = ENCODED_BLOCK_SIZES[clen];
+                for c in &encode_block(&buf[..clen])?[..block_size] {
+                    yield *c;
+                }
+
+                break;
+            }
+
+            if clen == FULL_BLOCK_SIZE {
+                // Buffer is full, yield a full block
+                for c in &encode_block(&buf)?[..] {
+                    yield *c;
+                }
+
+                clen = 0;
+            }
+        }
+    }
+}
+
 /// Encode a byte vector into a base58-check string, adds 4 bytes checksum
 #[cfg(feature = "check")]
 pub fn encode_check(data: &[u8]) -> Result<String> {
     let mut bytes = Vec::from(data);
     let mut checksum = [0u8; 32];
-    keccak_256(&bytes[..], &mut checksum);
-    bytes.extend_from_slice(&checksum[0..4]);
+    let mut hasher = Keccak::v256();
+    hasher.update(&bytes[..]);
+    hasher.finalize(&mut checksum);
+    bytes.extend_from_slice(&checksum[..CHECKSUM_SIZE]);
     encode(&bytes[..])
+}
+
+/// Encode a byte stream in a base58 stream of characters with a 4 bytes checksum
+#[cfg(all(feature = "check", feature = "stream"))]
+pub fn encode_stream_check<T>(mut data: T) -> impl Stream<Item = Result<char>>
+where
+    T: AsyncReadExt + Unpin,
+{
+    try_stream! {
+        let mut clen = 0;
+        let mut buf = [0; FULL_BLOCK_SIZE];
+        let mut checksum = [0u8; 32];
+        let mut hasher = Keccak::v256();
+
+        loop {
+            let len = data.read(&mut buf[clen..]).await?;
+            clen += len;
+
+            if len == 0 {
+                // EOF reached, final block is created
+                hasher.update(&buf[..clen]);
+                hasher.finalize(&mut checksum);
+
+                if clen + CHECKSUM_SIZE > FULL_BLOCK_SIZE {
+                    // Extend and encode the first bytes of checksum with the last block
+                    let sum_size = FULL_BLOCK_SIZE - clen;
+                    buf[clen..].copy_from_slice(&checksum[..sum_size]);
+
+                    for c in &encode_block(&buf)?[..] {
+                        yield *c;
+                    }
+
+                    // Return last encoded checksum bytes
+                    let block_size = ENCODED_BLOCK_SIZES[CHECKSUM_SIZE - sum_size];
+                    for c in &encode_block(&checksum[sum_size..CHECKSUM_SIZE])?[..block_size] {
+                        yield *c;
+                    }
+                } else {
+                    let start = clen;
+                    clen += CHECKSUM_SIZE;
+                    buf[start..clen].copy_from_slice(&checksum[..CHECKSUM_SIZE]);
+
+                    let block_size = ENCODED_BLOCK_SIZES[clen];
+                    for c in &encode_block(&buf[..clen])?[..block_size] {
+                        yield *c;
+                    }
+                }
+
+                break;
+            }
+
+            if clen == FULL_BLOCK_SIZE {
+                // Buffer is full, yield a full encoded block
+                hasher.update(&buf);
+
+                for c in &encode_block(&buf)?[..] {
+                    yield *c;
+                }
+
+                clen = 0;
+            }
+        }
+    }
 }
 
 /// Decode base58-encoded string into a byte vector
@@ -187,10 +347,44 @@ pub fn decode(data: &str) -> Result<Vec<u8>> {
         .collect();
     let mut res = Vec::new();
     data?.into_iter().for_each(|c| {
-        let bytes = &c.data[8 - c.size..];
+        let bytes = &c.data[FULL_BLOCK_SIZE - c.size..];
         res.extend_from_slice(bytes);
     });
     Ok(res)
+}
+
+/// Decode base58-encoded stream in a byte stream
+#[cfg(feature = "stream")]
+pub fn decode_stream<T>(mut data: T) -> impl Stream<Item = Result<u8>>
+where
+    T: AsyncReadExt + Unpin,
+{
+    try_stream! {
+        let mut clen = 0;
+        let mut buf = [0; FULL_ENCODED_BLOCK_SIZE];
+
+        loop {
+            let len = data.read(&mut buf[clen..]).await?;
+            clen += len;
+
+            if len == 0 {
+                // EOF reached
+                let block = decode_block(&buf[..clen])?;
+                for c in &block.data[FULL_BLOCK_SIZE - block.size..] {
+                    yield *c;
+                }
+                break;
+            }
+
+            if clen == FULL_ENCODED_BLOCK_SIZE {
+                let block = decode_block(&buf)?;
+                for c in &block.data[FULL_BLOCK_SIZE - block.size..] {
+                    yield *c;
+                }
+                clen = 0;
+            }
+        }
+    }
 }
 
 /// Decode base58-encoded with 4 bytes checksum string into a byte vector
@@ -199,26 +393,80 @@ pub fn decode_check(data: &str) -> Result<Vec<u8>> {
     let bytes = decode(data)?;
     let (bytes, checksum) = {
         let len = bytes.len();
-        (&bytes[..len - 4], &bytes[len - 4..len])
+        (
+            &bytes[..len - CHECKSUM_SIZE],
+            &bytes[len - CHECKSUM_SIZE..len],
+        )
     };
     let mut check = [0u8; 32];
-    keccak_256(&bytes[..], &mut check);
+    let mut hasher = Keccak::v256();
+    hasher.update(&bytes[..]);
+    hasher.finalize(&mut check);
 
-    if &check[..4] == checksum {
+    if &check[..CHECKSUM_SIZE] == checksum {
         Ok(Vec::from(bytes))
     } else {
         Err(Error::InvalidChecksum)
     }
 }
 
+/// Decode base58-encoded stream with a 4 bytes checksum in a decoded byte stream
+#[cfg(all(feature = "check", feature = "stream"))]
+pub fn decode_stream_check<T>(data: T) -> impl Stream<Item = Result<u8>>
+where
+    T: AsyncReadExt + Unpin,
+{
+    try_stream! {
+        let len = CHECKSUM_SIZE + 1;
+        let mut clen = 0;
+        let mut check = [0; CHECKSUM_SIZE];
+        let mut buf = [0; CHECKSUM_SIZE + 1];
+
+        let mut checksum = [0u8; 32];
+        let mut hasher = Keccak::v256();
+
+        let mut data = decode_stream(data);
+        pin_mut!(data);
+
+        while let Some(value) = data.next().await {
+            buf[clen % len] = value?;
+            if (clen >= CHECKSUM_SIZE) {
+                check[0] = buf[(clen - CHECKSUM_SIZE) % len];
+                hasher.update(&check[0..1]);
+                yield check[0];
+            }
+            clen += 1;
+        }
+
+        hasher.finalize(&mut checksum);
+        for i in 0..CHECKSUM_SIZE {
+            check[i] = buf[(clen - CHECKSUM_SIZE + i) % len];
+        }
+
+        if check != &checksum[..CHECKSUM_SIZE] {
+            Err(Error::InvalidChecksum)?;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    extern crate hex;
     use super::{
         decode, decode_block, encode, encode_block, u8be_to_u64, Error, ENCODED_BLOCK_SIZES,
+        FULL_BLOCK_SIZE,
     };
+
     #[cfg(feature = "check")]
     use super::{decode_check, encode_check};
+    #[cfg(feature = "stream")]
+    use super::{decode_stream, encode_stream};
+    #[cfg(all(feature = "check", feature = "stream"))]
+    use super::{decode_stream_check, encode_stream_check};
+
+    #[cfg(feature = "stream")]
+    use futures_util::pin_mut;
+    #[cfg(feature = "stream")]
+    use futures_util::stream::StreamExt;
 
     macro_rules! uint_8be_to_64 {
         ($expected:expr, $string:expr) => {
@@ -286,7 +534,7 @@ mod tests {
     macro_rules! decode_block_pos {
         ($enc:expr, $expected:expr) => {
             let res = decode_block($enc).unwrap();
-            assert_eq!(&$expected[..], &res.data[8 - res.size..]);
+            assert_eq!(&$expected[..], &res.data[FULL_BLOCK_SIZE - res.size..]);
         };
     }
 
@@ -521,6 +769,296 @@ mod tests {
         decode_neg!(Error::InvalidSymbol, "111111111111_111111111");
     }
 
+    #[cfg(feature = "stream")]
+    macro_rules! encode_stream {
+        ($stream:expr, $expected:expr, $func:expr) => {
+            let mut input: &[u8] = $stream;
+            let s = $func(&mut input);
+            pin_mut!(s);
+
+            let mut w: Vec<char> = vec![];
+
+            while let Some(value) = s.next().await {
+                w.push(value.unwrap());
+            }
+
+            let s: String = w.into_iter().collect();
+            assert_eq!(&$expected[..], &s[..]);
+        };
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    #[cfg(feature = "stream")]
+    async fn test_base58_encode_stream() {
+        encode_stream!(b"\x00", "11", encode_stream);
+        encode_stream!(b"\x39", "1z", encode_stream);
+        encode_stream!(b"\xFF", "5Q", encode_stream);
+
+        encode_stream!(b"\x00\x00", "111", encode_stream);
+        encode_stream!(b"\x00\x39", "11z", encode_stream);
+        encode_stream!(b"\x01\x00", "15R", encode_stream);
+        encode_stream!(b"\xFF\xFF", "LUv", encode_stream);
+
+        encode_stream!(b"\x00\x00\x00", "11111", encode_stream);
+        encode_stream!(b"\x00\x00\x39", "1111z", encode_stream);
+        encode_stream!(b"\x01\x00\x00", "11LUw", encode_stream);
+        encode_stream!(b"\xFF\xFF\xFF", "2UzHL", encode_stream);
+
+        encode_stream!(b"\x00\x00\x00\x39", "11111z", encode_stream);
+        encode_stream!(b"\xFF\xFF\xFF\xFF", "7YXq9G", encode_stream);
+        encode_stream!(b"\x00\x00\x00\x00\x39", "111111z", encode_stream);
+        encode_stream!(b"\xFF\xFF\xFF\xFF\xFF", "VtB5VXc", encode_stream);
+        encode_stream!(b"\x00\x00\x00\x00\x00\x39", "11111111z", encode_stream);
+        encode_stream!(b"\xFF\xFF\xFF\xFF\xFF\xFF", "3CUsUpv9t", encode_stream);
+        encode_stream!(b"\x00\x00\x00\x00\x00\x00\x39", "111111111z", encode_stream);
+        encode_stream!(b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF", "Ahg1opVcGW", encode_stream);
+
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x39",
+            "1111111111z",
+            encode_stream
+        );
+        encode_stream!(
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
+            "jpXCZedGfVQ",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00",
+            "11111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x01",
+            "11111111112",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x08",
+            "11111111119",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x09",
+            "1111111111A",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x3A",
+            "11111111121",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
+            "1Ahg1opVcGW",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x06\x15\x60\x13\x76\x28\x79\xF7",
+            "22222222222",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x05\xE0\x22\xBA\x37\x4B\x2A\x00",
+            "1z111111111",
+            encode_stream
+        );
+
+        encode_stream!(b"\x00", "11", encode_stream);
+        encode_stream!(b"\x00\x00", "111", encode_stream);
+        encode_stream!(b"\x00\x00\x00", "11111", encode_stream);
+        encode_stream!(b"\x00\x00\x00\x00", "111111", encode_stream);
+        encode_stream!(b"\x00\x00\x00\x00\x00", "1111111", encode_stream);
+        encode_stream!(b"\x00\x00\x00\x00\x00\x00", "111111111", encode_stream);
+        encode_stream!(b"\x00\x00\x00\x00\x00\x00\x00", "1111111111", encode_stream);
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00",
+            "11111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "1111111111111",
+            encode_stream
+        );
+
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "11111111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "1111111111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "11111111111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "111111111111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "11111111111111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "111111111111111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            "1111111111111111111111",
+            encode_stream
+        );
+        encode_stream!(
+            b"\x06\x15\x60\x13\x76\x28\x79\xF7\xFF\xFF\xFF\xFF\xFF",
+            "22222222222VtB5VXc",
+            encode_stream
+        );
+    }
+
+    #[cfg(feature = "stream")]
+    macro_rules! decode_stream_pos {
+        ($enc:expr, $expected:expr) => {
+            let mut input: &[u8] = $enc;
+            let s = decode_stream(&mut input);
+            pin_mut!(s);
+
+            let mut w: Vec<u8> = vec![];
+
+            while let Some(value) = s.next().await {
+                w.push(value.unwrap());
+            }
+
+            assert_eq!(Vec::from(&$expected[..]), w);
+        };
+    }
+
+    #[cfg(feature = "stream")]
+    macro_rules! decode_stream_neg {
+        ($expected:expr, $enc:expr) => {
+            let mut input: &[u8] = $enc;
+            let s = decode_stream(&mut input);
+            pin_mut!(s);
+
+            while let Some(value) = s.next().await {
+                match value {
+                    Ok(_) => (),
+                    Err(e) => assert_eq!($expected, e),
+                }
+            }
+        };
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    #[cfg(feature = "stream")]
+    async fn test_base58_decode_stream() {
+        decode_stream_pos!(b"", b"");
+        decode_stream_pos!(b"5Q", b"\xFF");
+        decode_stream_pos!(b"LUv", b"\xFF\xFF");
+        decode_stream_pos!(b"2UzHL", b"\xFF\xFF\xFF");
+        decode_stream_pos!(b"7YXq9G", b"\xFF\xFF\xFF\xFF");
+        decode_stream_pos!(b"VtB5VXc", b"\xFF\xFF\xFF\xFF\xFF");
+        decode_stream_pos!(b"3CUsUpv9t", b"\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_stream_pos!(b"Ahg1opVcGW", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_stream_pos!(b"jpXCZedGfVQ", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_stream_pos!(b"jpXCZedGfVQ5Q", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
+        decode_stream_pos!(
+            b"jpXCZedGfVQLUv",
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
+        decode_stream_pos!(
+            b"jpXCZedGfVQ2UzHL",
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
+        decode_stream_pos!(
+            b"jpXCZedGfVQ7YXq9G",
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
+        decode_stream_pos!(
+            b"jpXCZedGfVQVtB5VXc",
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
+        decode_stream_pos!(
+            b"jpXCZedGfVQ3CUsUpv9t",
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
+        decode_stream_pos!(
+            b"jpXCZedGfVQAhg1opVcGW",
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
+        decode_stream_pos!(
+            b"jpXCZedGfVQjpXCZedGfVQ",
+            b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
+        // Invalid length
+        decode_stream_neg!(Error::InvalidBlockSize, b"1");
+        decode_stream_neg!(Error::InvalidBlockSize, b"z");
+        decode_stream_neg!(Error::InvalidBlockSize, b"1111");
+        decode_stream_neg!(Error::InvalidBlockSize, b"zzzz");
+        decode_stream_neg!(Error::InvalidBlockSize, b"11111111");
+        decode_stream_neg!(Error::InvalidBlockSize, b"zzzzzzzz");
+        decode_stream_neg!(Error::InvalidBlockSize, b"123456789AB1");
+        decode_stream_neg!(Error::InvalidBlockSize, b"123456789ABz");
+        decode_stream_neg!(Error::InvalidBlockSize, b"123456789AB1111");
+        decode_stream_neg!(Error::InvalidBlockSize, b"123456789ABzzzz");
+        decode_stream_neg!(Error::InvalidBlockSize, b"123456789AB11111111");
+        decode_stream_neg!(Error::InvalidBlockSize, b"123456789ABzzzzzzzz");
+        // Overflow
+        decode_stream_neg!(Error::Overflow, b"5R");
+        decode_stream_neg!(Error::Overflow, b"zz");
+        decode_stream_neg!(Error::Overflow, b"LUw");
+        decode_stream_neg!(Error::Overflow, b"zzz");
+        decode_stream_neg!(Error::Overflow, b"2UzHM");
+        decode_stream_neg!(Error::Overflow, b"zzzzz");
+        decode_stream_neg!(Error::Overflow, b"7YXq9H");
+        decode_stream_neg!(Error::Overflow, b"zzzzzz");
+        decode_stream_neg!(Error::Overflow, b"VtB5VXd");
+        decode_stream_neg!(Error::Overflow, b"zzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"3CUsUpv9u");
+        decode_stream_neg!(Error::Overflow, b"zzzzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"Ahg1opVcGX");
+        decode_stream_neg!(Error::Overflow, b"zzzzzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"jpXCZedGfVR");
+        decode_stream_neg!(Error::Overflow, b"zzzzzzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"123456789AB5R");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzz");
+        decode_stream_neg!(Error::Overflow, b"123456789ABLUw");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzzz");
+        decode_stream_neg!(Error::Overflow, b"123456789AB2UzHM");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzzzzz");
+        decode_stream_neg!(Error::Overflow, b"123456789AB7YXq9H");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"123456789ABVtB5VXd");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"123456789AB3CUsUpv9u");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzzzzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"123456789ABAhg1opVcGX");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzzzzzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"123456789ABjpXCZedGfVR");
+        decode_stream_neg!(Error::Overflow, b"123456789ABzzzzzzzzzzz");
+        decode_stream_neg!(Error::Overflow, b"zzzzzzzzzzz11");
+        // Invalid symbols
+        decode_stream_neg!(Error::InvalidSymbol, b"10");
+        decode_stream_neg!(Error::InvalidSymbol, b"11I");
+        decode_stream_neg!(Error::InvalidSymbol, b"11O11");
+        decode_stream_neg!(Error::InvalidSymbol, b"11l111");
+        decode_stream_neg!(Error::InvalidSymbol, b"11_11111111");
+        decode_stream_neg!(Error::InvalidSymbol, b"1101111111111");
+        decode_stream_neg!(Error::InvalidSymbol, b"11I11111111111111");
+        decode_stream_neg!(Error::InvalidSymbol, b"11O1111111111111111111");
+        decode_stream_neg!(Error::InvalidSymbol, b"1111111111110");
+        decode_stream_neg!(Error::InvalidSymbol, b"111111111111l1111");
+        decode_stream_neg!(Error::InvalidSymbol, b"111111111111_111111111");
+    }
+
     macro_rules! encode_address {
         ($expected:expr, $hex:expr, $func:expr) => {
             let hex = hex::decode($hex).unwrap();
@@ -577,10 +1115,60 @@ mod tests {
         );
     }
 
+    #[cfg(all(feature = "check", feature = "stream"))]
+    macro_rules! encode_stream_address {
+        ($stream:expr, $expected:expr, $func:expr) => {
+            let mut input: &[u8] = &hex::decode($stream).unwrap()[..];
+            let s = $func(&mut input);
+            pin_mut!(s);
+
+            let mut w: Vec<char> = vec![];
+
+            while let Some(value) = s.next().await {
+                w.push(value.unwrap());
+            }
+
+            let s: String = w.into_iter().collect();
+            assert_eq!(&$expected[..], &s[..]);
+        };
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    #[cfg(all(feature = "check", feature = "stream"))]
+    async fn test_base58_encode_stream_check() {
+        encode_stream_address!(
+            "12f4bd0587c43594b0ddb2ef4e616d24232d14eee07f45b46ac19ef3b11e7c7e6be2a59b6284ad5b1a1b43051d07e788756dcfff36008637322a1c975eeb614927",
+            "4Au2dGq2uFHWapfkU1RF4X6tFdY1rKtNfJrfsNSUinrRK3d8ZBViLtz5NGQiBM1xM5LeD4ak5Q2869PfC7hUWuDA5RzvSk5",
+            encode_stream_check
+        );
+        encode_stream_address!(
+            "1298a05f07a0c9f94da6e0bb1ebe819748ab787e95b72f6157555d2fa45644e076319c740890b4f86fdbe5528942af2c52c6810b6c9773d903437c090d99b39707",
+            "47Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            encode_stream_check
+        );
+        encode_stream_address!(
+            "1284c19bf4557a66aaa18f2af53814d694a7ccf0c6a245bcb10546ea40f6e261a8b6a587843c6943beeba8f386547f53e332bcef66bfee04de027879b51ec5fbe9",
+            "46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLVDjTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            encode_stream_check
+        );
+        encode_stream_address!(
+            "128916f019baad1f65e2eb2deae8af83045d7be1accf57034fb2b23b72a4cf023a9429b5ffcaf9daf1f4d5e3c85906aefc554f15e95956c185e60e5521cb71b8b6",
+            "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            encode_stream_check
+        );
+    }
+
     macro_rules! decode_address {
         ($expected:expr, $addr:expr, $func:expr) => {
             let hex = hex::decode($expected).unwrap();
             assert_eq!(Ok(hex), $func($addr));
+        };
+    }
+
+    #[cfg(feature = "check")]
+    macro_rules! decode_address_neg {
+        ($expected:expr, $addr:expr, $func:expr) => {
+            assert_eq!(Err($expected), $func($addr));
         };
     }
 
@@ -630,6 +1218,106 @@ mod tests {
             "128916f019baad1f65e2eb2deae8af83045d7be1accf57034fb2b23b72a4cf023a9429b5ffcaf9daf1f4d5e3c85906aefc554f15e95956c185e60e5521cb71b8b6",
             "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
             decode_check
+        );
+
+        decode_address_neg!(
+            Error::InvalidChecksum,
+            "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq3",
+            decode_check
+        );
+        decode_address_neg!(
+            Error::InvalidChecksum,
+            "46Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            decode_check
+        );
+        decode_address_neg!(
+            Error::InvalidChecksum,
+            "46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLV3jTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            decode_check
+        );
+        decode_address_neg!(
+            Error::InvalidChecksum,
+            "46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguA1HfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            decode_check
+        );
+    }
+
+    #[cfg(all(feature = "check", feature = "stream"))]
+    macro_rules! decode_stream_address {
+        ($stream:expr, $expected:expr, $func:expr) => {
+            let mut input: &[u8] = &$stream[..];
+            let s = $func(&mut input);
+            pin_mut!(s);
+
+            let mut w: Vec<u8> = vec![];
+
+            while let Some(value) = s.next().await {
+                w.push(value.unwrap());
+            }
+
+            assert_eq!(hex::decode($expected).unwrap(), w);
+        };
+    }
+
+    #[cfg(all(feature = "check", feature = "stream"))]
+    macro_rules! decode_stream_address_neg {
+        ($expected:expr, $stream:expr, $func:expr) => {
+            let mut input: &[u8] = &$stream[..];
+            let s = $func(&mut input);
+            pin_mut!(s);
+
+            while let Some(value) = s.next().await {
+                match value {
+                    Ok(_) => (),
+                    Err(e) => assert_eq!($expected, e),
+                }
+            }
+        };
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    #[cfg(all(feature = "check", feature = "stream"))]
+    async fn test_base58_decode_stream_check() {
+        decode_stream_address!(
+            b"4Au2dGq2uFHWapfkU1RF4X6tFdY1rKtNfJrfsNSUinrRK3d8ZBViLtz5NGQiBM1xM5LeD4ak5Q2869PfC7hUWuDA5RzvSk5",
+            "12f4bd0587c43594b0ddb2ef4e616d24232d14eee07f45b46ac19ef3b11e7c7e6be2a59b6284ad5b1a1b43051d07e788756dcfff36008637322a1c975eeb614927",
+            decode_stream_check
+        );
+        decode_stream_address!(
+            b"47Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            "1298a05f07a0c9f94da6e0bb1ebe819748ab787e95b72f6157555d2fa45644e076319c740890b4f86fdbe5528942af2c52c6810b6c9773d903437c090d99b39707",
+            decode_stream_check
+        );
+        decode_stream_address!(
+            b"46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLVDjTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            "1284c19bf4557a66aaa18f2af53814d694a7ccf0c6a245bcb10546ea40f6e261a8b6a587843c6943beeba8f386547f53e332bcef66bfee04de027879b51ec5fbe9",
+            decode_stream_check
+        );
+        decode_stream_address!(
+            b"46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            "128916f019baad1f65e2eb2deae8af83045d7be1accf57034fb2b23b72a4cf023a9429b5ffcaf9daf1f4d5e3c85906aefc554f15e95956c185e60e5521cb71b8b6",
+            decode_stream_check
+        );
+
+        decode_stream_address_neg!(
+            Error::InvalidChecksum,
+            b"46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguAoHfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq3",
+            decode_stream_check
+        );
+        decode_stream_address_neg!(
+            Error::InvalidChecksum,
+            b"46Qa9iJeiYxDzKakP4SxpWD9zKB7B1nYgFcF9TdvxVzXLmdR6dX8BNPKiAyyZqVbcPEr2TYdJrRxC1YfM1APP9qg1oBnVip",
+            decode_stream_check
+        );
+        decode_stream_address_neg!(
+            Error::InvalidChecksum,
+            b"46eu6J7WC5jVYLT2NPovGDRs9NMyJpeH1WcKfBRNZ1CLV3jTDtKopLiYwAmhc4Bx9gf17DGe6CubRe8mm3Z1HNqgTNKbyu8",
+            decode_stream_check
+        );
+        decode_stream_address_neg!(
+            Error::InvalidChecksum,
+            b"46pRWGRUvUvJ3Rh7kRujCW1jMASA18S9xELAuPT28dguA1HfhLZVKqshUHF7XwdmUZjCx1jaEkYHWPPz7WVkz26TMbFxFq2",
+            decode_stream_check
         );
     }
 }

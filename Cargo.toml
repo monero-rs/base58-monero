@@ -3,7 +3,7 @@ name = "base58-monero"
 description = "Library with support for encoding/decoding Monero base58 strings."
 keywords = ["monero", "base58", "base58-check"]
 version = "0.1.1"
-authors = ["h4sh3d <h4sh3d@truelevel.io>"]
+authors = ["h4sh3d <h4sh3d@protonmail.com>"]
 license-file = "LICENSE"
 documentation = "https://docs.rs/base58-monero"
 homepage = "https://github.com/monero-rs/base58-monero-rs"
@@ -13,14 +13,19 @@ readme = "README.md"
 edition = "2018"
 
 [features]
-check = ["keccak-hash"]
-default = ["check"]
+check = ["tiny-keccak"]
+stream = ["tokio", "async-stream", "futures-util"]
+default = ["check", "stream"]
 
 [dependencies]
-keccak-hash = { version = "0.1", optional = true }
+tiny-keccak = { version = "2.0.1", features = ["keccak"], optional = true }
+async-stream = { version = "0.2.0", optional = true }
+tokio =  { version = "0.2.6", features = ["stream", "io-util"], optional = true }
+futures-util = { version = "0.3.1", optional = true }
 
 [dev-dependencies]
 hex = "0.3"
+tokio =  { version = "0.2.6", features = ["stream", "macros"] }
 
 [badges]
 travis-ci = { repository = "monero-rs/base58-monero-rs", branch = "master" }
