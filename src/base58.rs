@@ -514,9 +514,7 @@ mod tests {
     use super::{decode_stream_check, encode_stream_check};
 
     #[cfg(feature = "stream")]
-    use futures_util::pin_mut;
-    #[cfg(feature = "stream")]
-    use futures_util::stream::StreamExt;
+    use futures_util::{pin_mut, stream::StreamExt};
 
     macro_rules! uint_8be_to_64 {
         ($expected:expr, $string:expr) => {
