@@ -28,7 +28,7 @@ If you don't want to include all default features in your project:
 
 ```
 [dependencies.base58-monero]
-version = "0.1"
+version = "0.2"
 default-features = false
 ```
 
