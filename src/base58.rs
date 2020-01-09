@@ -13,12 +13,61 @@
 // copies or substantial portions of the Software.
 //
 
+//! Base58 encoder and decoder
+//!
+//! ## Examples Streams
+//!
+//! Async streams can be used with `feature = stream`:
+//!
+//! ```rust
+//! use futures_util::pin_mut;
+//! use futures_util::stream::StreamExt;
+//! use base58_monero::{encode_stream, Error};
+//!
+//! async {
+//!     let mut input: &[u8] = b"Hello World";
+//!     let mut w: Vec<char> = vec![];
+//!
+//!     let s = encode_stream(&mut input);
+//!     pin_mut!(s);
+//!
+//!     while let Some(value) = s.next().await {
+//!         w.push(value?);
+//!     }
+//!
+//!     let s: String = w.into_iter().collect();
+//!     assert_eq!("D7LMXYjUbXc1fS9Z", &s[..]);
+//! # Ok::<(), Error>(())
+//! };
+//! ```
+//! Async decoding with `decode_stream` and `decode_stream_check` is available with `feature =
+//! check` and `feature = stream`:
+//!
+//! ```rust
+//! use futures_util::pin_mut;
+//! use futures_util::stream::StreamExt;
+//! use base58_monero::{decode_stream, Error};
+//!
+//! async {
+//!     let mut input: &[u8] = b"D7LMXYjUbXc1fS9Z";
+//!     let mut w: Vec<u8> = vec![];
+//!
+//!     let s = decode_stream(&mut input);
+//!     pin_mut!(s);
+//!
+//!     while let Some(value) = s.next().await {
+//!         w.push(value?);
+//!     }
+//!
+//!     assert_eq!(b"Hello World", &w[..]);
+//! # Ok::<(), Error>(())
+//! };
+//! ```
+
 #[cfg(feature = "stream")]
 use async_stream::try_stream;
-#[cfg(feature = "stream")]
-use futures_util::pin_mut;
-#[cfg(feature = "stream")]
-use futures_util::stream::StreamExt;
+#[cfg(all(feature = "check", feature = "stream"))]
+use futures_util::{pin_mut, stream::StreamExt};
 #[cfg(feature = "check")]
 use tiny_keccak::{Hasher, Keccak};
 #[cfg(feature = "stream")]
@@ -32,20 +81,20 @@ use std::io;
 use std::num::Wrapping;
 use std::{error, fmt};
 
-/// Base58 alphabet
+/// Base58 alphabet, does not contains visualy similar characters
 pub const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-/// Resulted block size given a [0..8] bytes block
+/// Resulted block size given a `0..=8` bytes block
 pub const ENCODED_BLOCK_SIZES: [usize; 9] = [0, 2, 3, 5, 6, 7, 9, 10, 11];
-/// Size of block to encode
+/// Maximum size of block to encode
 pub const FULL_BLOCK_SIZE: usize = 8;
-/// Size of an encoded 8 bytes block
+/// Size of an encoded 8 bytes block, i.e. maximum encoded block size
 pub const FULL_ENCODED_BLOCK_SIZE: usize = ENCODED_BLOCK_SIZES[FULL_BLOCK_SIZE];
 /// Size of checksum
 pub const CHECKSUM_SIZE: usize = 4;
 
-/// Possible errors when encoding/decoding base58 and base58-check strings.
+/// Possible errors when encoding/decoding base58 and base58-check strings
 pub enum Error {
-    /// Invalid block size, must be 1...8
+    /// Invalid block size, must be `1..=8`
     InvalidBlockSize,
     /// Symbol not in base58 alphabet
     InvalidSymbol,
@@ -128,6 +177,7 @@ impl From<io::Error> for Error {
     }
 }
 
+/// Utility type for handling results with base58 error type
 pub type Result<T> = std::result::Result<T, Error>;
 
 fn u8be_to_u64(data: &[u8]) -> u64 {
