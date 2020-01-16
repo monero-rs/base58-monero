@@ -61,6 +61,9 @@
 
 #![recursion_limit = "256"]
 
+// Coding conventions
+#![forbid(unsafe_code)]
+
 pub mod base58;
 
 pub use base58::decode;
