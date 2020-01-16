@@ -9,6 +9,11 @@ documentation = "https://docs.rs/base58-monero"
 homepage = "https://github.com/monero-rs/base58-monero-rs"
 repository = "https://github.com/monero-rs/base58-monero-rs"
 readme = "README.md"
+include = [
+    "src/*",
+    "README.md",
+    "LICENSE",
+]
 
 edition = "2018"
 
