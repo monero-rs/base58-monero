@@ -60,7 +60,6 @@
 //! ```
 
 #![recursion_limit = "256"]
-
 // Coding conventions
 #![forbid(unsafe_code)]
 

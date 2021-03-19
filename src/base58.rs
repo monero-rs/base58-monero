@@ -75,11 +75,11 @@ use tokio::io::AsyncReadExt;
 #[cfg(feature = "stream")]
 use tokio::stream::Stream;
 
-use std::fmt::Display;
+use thiserror::Error;
+
 #[cfg(feature = "stream")]
 use std::io;
 use std::num::Wrapping;
-use std::{error, fmt};
 
 /// Base58 alphabet, does not contains visualy similar characters
 pub const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -93,51 +93,25 @@ pub const FULL_ENCODED_BLOCK_SIZE: usize = ENCODED_BLOCK_SIZES[FULL_BLOCK_SIZE];
 pub const CHECKSUM_SIZE: usize = 4;
 
 /// Possible errors when encoding/decoding base58 and base58-check strings
+#[derive(Error, Debug)]
 pub enum Error {
     /// Invalid block size, must be `1..=8`
+    #[error("Invalid block size error")]
     InvalidBlockSize,
     /// Symbol not in base58 alphabet
+    #[error("Invalid symbol error")]
     InvalidSymbol,
-    #[cfg(feature = "check")]
     /// Invalid 4-bytes checksum
+    #[cfg(feature = "check")]
+    #[error("Invalid checksum error")]
     InvalidChecksum,
     /// Decoding overflow
+    #[error("Overflow error")]
     Overflow,
-    #[cfg(feature = "stream")]
     /// IO error on stream
-    Io(io::Error),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::InvalidBlockSize => write!(f, "invalid block size"),
-            Error::InvalidSymbol => write!(f, "invalid symbol"),
-            #[cfg(feature = "check")]
-            Error::InvalidChecksum => write!(f, "invalid checksum"),
-            Error::Overflow => write!(f, "overflow"),
-            #[cfg(feature = "stream")]
-            Error::Io(e) => write!(f, "overflow, {}", e),
-        }
-    }
-}
-
-impl fmt::Debug for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
-    }
-}
-
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            Error::InvalidBlockSize | Error::InvalidSymbol | Error::Overflow => None,
-            #[cfg(feature = "check")]
-            Error::InvalidChecksum => None,
-            #[cfg(feature = "stream")]
-            Error::Io(e) => Some(e),
-        }
-    }
+    #[cfg(feature = "stream")]
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
 }
 
 impl PartialEq for Error {
@@ -167,13 +141,6 @@ impl PartialEq for Error {
                 _ => false,
             },
         }
-    }
-}
-
-#[cfg(feature = "stream")]
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::Io(e)
     }
 }
 
