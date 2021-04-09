@@ -27,6 +27,23 @@
 //! `1` and `l` are not part of the alphabet together, only `1` is present. The full alphabet is
 //! composed of: `123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz`
 //!
+//! ## Features
+//!
+//!  * `check`: enable encoding/decoding base58 strings with a 4 bytes tail checksum.
+//!  * `stream`: enable encoding/decoding base58 asyncronous streams of data.
+//!
+//! Both features are enabled by default, to remove them use:
+//!
+//! ```text
+//! base58-monero = { version = "0.3", default-features = false }
+//! ```
+//!
+//! or to enable only one use:
+//!
+//! ```text
+//! base58-monero = { version = "0.3", default-features = false, features = ["check"] }
+//! ```
+//!
 //! ## Examples
 //!
 //! Encoding and decoding an array of bytes with Monero base58 format:
@@ -43,7 +60,7 @@
 //! # Ok::<(), Error>(())
 //! ```
 //!
-//! With `feature = check` Monero base58 also comes with a `checksum` mode. The checksum is
+//! With the `check` feature Monero base58 also comes with a `checksum` mode. The checksum is
 //! composed with the first 4 bytes of a `Keccak256` result of the string. Encoding and decoding
 //! with a checksum:
 //!
@@ -59,9 +76,12 @@
 //! # Ok::<(), Error>(())
 //! ```
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 #![recursion_limit = "256"]
 // Coding conventions
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 
 pub mod base58;
 

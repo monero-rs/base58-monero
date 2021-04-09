@@ -20,31 +20,28 @@ The alphabet is composed of 58 characters visually not similar to avoid confusio
 `l` are not part of the alphabet together, only `1` is present. The full alphabet is composed of:
 `123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz`
 
-
-Features
-===
+## Features
 
 If you don't want to include all default features in your project:
 
 ```
 [dependencies.base58-monero]
-version = "0.2"
+version = "0.3"
 default-features = false
 ```
 
-## `check`
+### `check`
 
 Enables `encode_check` and `decode_check` functions. By default `check` feature is enable.
 
-## `stream`
+### `stream`
 
 Enables `encode_stream` and `decode_stream` functions. By default `stream` feature is enable. This
 feature enables async stream for encoding/decoding bytes. This should be used when encoding larger
 amount of data or in asyncronous environment. `stream` can be used with `check` to enable
 `encode_stream_check` and `decode_stream_check`.
 
-About
-===
+## About
 
 This started as a research project sponsored by TrueLevel SA. It is now maintained by community
 members.

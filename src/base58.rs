@@ -13,17 +13,18 @@
 // copies or substantial portions of the Software.
 //
 
-//! Base58 encoder and decoder
+//! Base58 encoder and decoder functions and constants
 //!
-//! ## Examples Streams
+//! ## Stream Examples
 //!
-//! Async streams can be used with `feature = stream`:
+//! Async streams can be used with the `stream` feature:
 //!
 //! ```rust
 //! use futures_util::pin_mut;
 //! use futures_util::stream::StreamExt;
 //! use base58_monero::{encode_stream, Error};
 //!
+//! # tokio_test::block_on(
 //! async {
 //!     let mut input: &[u8] = b"Hello World";
 //!     let mut w: Vec<char> = vec![];
@@ -37,22 +38,25 @@
 //!
 //!     let s: String = w.into_iter().collect();
 //!     assert_eq!("D7LMXYjUbXc1fS9Z", &s[..]);
+//!     # Ok::<(), Error>(())
+//! }
+//! # )?;
 //! # Ok::<(), Error>(())
-//! };
 //! ```
-//! Async decoding with `decode_stream` and `decode_stream_check` is available with `feature =
-//! check` and `feature = stream`:
+//! Async decoding with `decode_stream` and `decode_stream_check` is available with the features `check` and
+//! `stream` enabled:
 //!
 //! ```rust
 //! use futures_util::pin_mut;
 //! use futures_util::stream::StreamExt;
-//! use base58_monero::{decode_stream, Error};
+//! use base58_monero::{decode_stream_check, Error};
 //!
+//! # tokio_test::block_on(
 //! async {
-//!     let mut input: &[u8] = b"D7LMXYjUbXc1fS9Z";
+//!     let mut input: &[u8] = b"D7LMXYjUbXc5LVkq6vWDY";
 //!     let mut w: Vec<u8> = vec![];
 //!
-//!     let s = decode_stream(&mut input);
+//!     let s = decode_stream_check(&mut input);
 //!     pin_mut!(s);
 //!
 //!     while let Some(value) = s.next().await {
@@ -60,8 +64,10 @@
 //!     }
 //!
 //!     assert_eq!(b"Hello World", &w[..]);
+//!     # Ok::<(), Error>(())
+//! }
+//! # )?;
 //! # Ok::<(), Error>(())
-//! };
 //! ```
 
 #[cfg(feature = "stream")]
@@ -103,13 +109,18 @@ pub enum Error {
     InvalidSymbol,
     /// Invalid 4-bytes checksum
     #[cfg(feature = "check")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "check")))]
     #[error("Invalid checksum error")]
     InvalidChecksum,
     /// Decoding overflow
     #[error("Overflow error")]
     Overflow,
     /// IO error on stream
+    ///
+    /// [PartialEq] implementation return true if the other error is also and IO error but do NOT
+    /// test the wrapped errors.
     #[cfg(feature = "stream")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
 }
@@ -246,6 +257,7 @@ pub fn encode(data: &[u8]) -> Result<String> {
 
 /// Encdoe a byte stream in a base58 stream of characters
 #[cfg(feature = "stream")]
+#[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
 pub fn encode_stream<T>(mut data: T) -> impl Stream<Item = Result<char>>
 where
     T: AsyncReadExt + Unpin,
@@ -282,6 +294,7 @@ where
 
 /// Encode a byte vector into a base58-check string, adds 4 bytes checksum
 #[cfg(feature = "check")]
+#[cfg_attr(docsrs, doc(cfg(feature = "check")))]
 pub fn encode_check(data: &[u8]) -> Result<String> {
     let mut bytes = Vec::from(data);
     let mut checksum = [0u8; 32];
@@ -294,6 +307,7 @@ pub fn encode_check(data: &[u8]) -> Result<String> {
 
 /// Encode a byte stream in a base58 stream of characters with a 4 bytes checksum
 #[cfg(all(feature = "check", feature = "stream"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "check", feature = "stream"))))]
 pub fn encode_stream_check<T>(mut data: T) -> impl Stream<Item = Result<char>>
 where
     T: AsyncReadExt + Unpin,
@@ -372,6 +386,7 @@ pub fn decode(data: &str) -> Result<Vec<u8>> {
 
 /// Decode base58-encoded stream in a byte stream
 #[cfg(feature = "stream")]
+#[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
 pub fn decode_stream<T>(mut data: T) -> impl Stream<Item = Result<u8>>
 where
     T: AsyncReadExt + Unpin,
@@ -406,6 +421,7 @@ where
 
 /// Decode base58-encoded with 4 bytes checksum string into a byte vector
 #[cfg(feature = "check")]
+#[cfg_attr(docsrs, doc(cfg(feature = "check")))]
 pub fn decode_check(data: &str) -> Result<Vec<u8>> {
     let bytes = decode(data)?;
     let (bytes, checksum) = {
@@ -429,6 +445,7 @@ pub fn decode_check(data: &str) -> Result<Vec<u8>> {
 
 /// Decode base58-encoded stream with a 4 bytes checksum in a decoded byte stream
 #[cfg(all(feature = "check", feature = "stream"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "check", feature = "stream"))))]
 pub fn decode_stream_check<T>(data: T) -> impl Stream<Item = Result<u8>>
 where
     T: AsyncReadExt + Unpin,
