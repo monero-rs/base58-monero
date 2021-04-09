@@ -66,14 +66,14 @@
 
 #[cfg(feature = "stream")]
 use async_stream::try_stream;
+#[cfg(feature = "stream")]
+use futures_util::stream::Stream;
 #[cfg(all(feature = "check", feature = "stream"))]
 use futures_util::{pin_mut, stream::StreamExt};
 #[cfg(feature = "check")]
 use tiny_keccak::{Hasher, Keccak};
 #[cfg(feature = "stream")]
 use tokio::io::AsyncReadExt;
-#[cfg(feature = "stream")]
-use tokio::stream::Stream;
 
 use thiserror::Error;
 
@@ -442,7 +442,7 @@ where
         let mut checksum = [0u8; 32];
         let mut hasher = Keccak::v256();
 
-        let mut data = decode_stream(data);
+        let data = decode_stream(data);
         pin_mut!(data);
 
         while let Some(value) = data.next().await {
@@ -802,7 +802,7 @@ mod tests {
         };
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "stream")]
     async fn test_base58_encode_stream() {
         encode_stream!(b"\x00", "11", encode_stream);
@@ -972,7 +972,7 @@ mod tests {
         };
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "stream")]
     async fn test_base58_decode_stream() {
         decode_stream_pos!(b"", b"");
@@ -1148,7 +1148,7 @@ mod tests {
         };
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[cfg(all(feature = "check", feature = "stream"))]
     async fn test_base58_encode_stream_check() {
         encode_stream_address!(
@@ -1290,7 +1290,7 @@ mod tests {
         };
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[cfg(all(feature = "check", feature = "stream"))]
     async fn test_base58_decode_stream_check() {
         decode_stream_address!(
