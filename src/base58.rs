@@ -66,8 +66,10 @@
 
 #[cfg(feature = "stream")]
 use async_stream::try_stream;
+#[cfg(feature = "stream")]
+use futures_util::stream::Stream;
 #[cfg(all(feature = "check", feature = "stream"))]
-use futures_util::{pin_mut, stream::StreamExt, stream::Stream};
+use futures_util::{pin_mut, stream::StreamExt};
 #[cfg(feature = "check")]
 use tiny_keccak::{Hasher, Keccak};
 #[cfg(feature = "stream")]
