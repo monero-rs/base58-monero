@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    strategy:
+      matrix:
+        rust: [
+            stable,
+            nightly
+        ]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install Rust ${{ matrix.rust }}
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        override: true
+        profile: minimal
+
+      - uses: Swatinem/rust-cache@v1.2.0
+
+    - name: Build with no default features
+      run: cargo build --verbose --no-default-features
+
+    - name: Build with feature 'check'
+      run: cargo build --verbose --no-default-features --features check
+
+    - name: Build with feature 'stream'
+      run: cargo build --verbose --no-default-features --features stream
+
+    - name: Build full features
+      run: cargo build --verbose
+
+    - name: Install wasm32 target
+      uses: actions-rs/toolchain@v1
+      with:
+          target: wasm32-unknown-unknown
+          override: true
+
+    - name: Build wasm with check feature
+      run: cargo build --verbose --no-default-features --features check
+
+  test:
+
+    strategy:
+      matrix:
+        rust: [
+            stable,
+            nightly
+        ]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install Rust ${{ matrix.rust }}
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        override: true
+        profile: minimal
+
+    - uses: Swatinem/rust-cache@v1.2.0
+
+    - run: cargo test --verbose
