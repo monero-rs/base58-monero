@@ -6,8 +6,8 @@ version = "0.3.0"
 authors = ["h4sh3d <h4sh3d@protonmail.com>"]
 license = "MIT"
 documentation = "https://docs.rs/base58-monero"
-homepage = "https://github.com/monero-rs/base58-monero-rs"
-repository = "https://github.com/monero-rs/base58-monero-rs"
+homepage = "https://github.com/monero-rs/base58-monero"
+repository = "https://github.com/monero-rs/base58-monero"
 readme = "README.md"
 include = [
     "src/*",
