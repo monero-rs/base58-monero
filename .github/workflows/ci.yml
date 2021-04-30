@@ -24,11 +24,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install Rust ${{ matrix.rust }}
+    - name: Install Rust ${{ matrix.rust }} with wasm32
       uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.rust }}
         override: true
+        target: wasm32-unknown-unknown
         profile: minimal
 
     - uses: Swatinem/rust-cache@v1.2.0
@@ -44,12 +45,6 @@ jobs:
 
     - name: Build full features
       run: cargo build --verbose
-
-    - name: Install wasm32 target
-      uses: actions-rs/toolchain@v1
-      with:
-          target: wasm32-unknown-unknown
-          override: true
 
     - name: Build wasm with check feature
       run: cargo build --verbose --no-default-features --features check
