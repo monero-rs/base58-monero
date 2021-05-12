@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2.3.4
 
     - name: Install Rust ${{ matrix.rust }} with wasm32
       uses: actions-rs/toolchain@v1
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2.3.4
 
     - name: Install Rust ${{ matrix.rust }}
       uses: actions-rs/toolchain@v1
