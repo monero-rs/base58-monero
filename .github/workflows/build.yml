@@ -1,4 +1,4 @@
-name: CI
+name: Build
 
 on:
   push:
@@ -10,13 +10,33 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  rustdoc:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install Rust Nightly
+      uses: actions-rs/toolchain@v1.0.7
+      with:
+        toolchain: nightly
+        override: true
+        profile: minimal
+
+    - name: Build rust doc
+      run: cargo doc --all-features --no-deps
+      env:
+        RUSTDOCFLAGS: "--cfg docsrs"
+
   build:
 
     strategy:
       matrix:
         rust: [
-            stable,
-            nightly
+          1.45.2,
+          stable,
+          nightly
         ]
 
     runs-on: ubuntu-latest
@@ -54,8 +74,8 @@ jobs:
     strategy:
       matrix:
         rust: [
-            stable,
-            nightly
+          stable,
+          nightly
         ]
 
     runs-on: ubuntu-latest
