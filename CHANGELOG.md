@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 N/A
 
-## [0.3.0] - 2019-04-09
+## [0.3.0] - 2021-04-09
 ### Changed
 - Update to `tokio` version `"1"` ([#1](https://github.com/monero-rs/base58-monero/pull/1))
 - Improve async doc code example tests runtime with `tokio_test`
