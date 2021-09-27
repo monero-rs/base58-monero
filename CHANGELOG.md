@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 N/A
 
+## [0.3.1] - 2021-09-27
+### Changed
+- CI migrated to GitHub Actions with more tests and build
+- `hex` dependency bumped from `0.3` to `0.4` ([#2](https://github.com/monero-rs/base58-monero/pull/2))
+
+### Added
+- Minimum Stable Rust Version of `1.45.2`
+- Changelog tracking past and futur release
+- Benchmarks and results in README ([#6](https://github.com/monero-rs/base58-monero/pull/6))
+- Code coverage ([#7](https://github.com/monero-rs/base58-monero/pull/7))
+
 ## [0.3.0] - 2021-04-09
 ### Changed
 - Update to `tokio` version `"1"` ([#1](https://github.com/monero-rs/base58-monero/pull/1))
@@ -34,7 +45,8 @@ N/A
 ### Added
 - Initial release of the library
 
-[Unreleased]: https://github.com/monero-rs/base58-monero/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/monero-rs/base58-monero/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/monero-rs/base58-monero/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/monero-rs/base58-monero/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/monero-rs/base58-monero/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/monero-rs/base58-monero/compare/v0.1.1...v0.2.0
