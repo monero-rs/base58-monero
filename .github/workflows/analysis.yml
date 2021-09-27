@@ -28,6 +28,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install Rust Nightly
+      uses: actions-rs/toolchain@v1.0.7
+      with:
+        toolchain: nightly
+        override: true
+        profile: minimal
+        components: clippy
+
     - name: Run Clippy
       run: cargo clippy --workspace --all-targets -- -D warnings
 
