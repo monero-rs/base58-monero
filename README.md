@@ -47,6 +47,20 @@ feature enables async stream for encoding/decoding bytes. This should be used wh
 amount of data or in asyncronous environment. `stream` can be used with `check` to enable
 `encode_stream_check` and `decode_stream_check`.
 
+## Benchmarks
+
+Results obtained on an Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz with a standard Monero address as data source.
+Performances are shown in nanosecond per iteration of compute, the smaller the better:
+
+| Operation | Regular            | `_check`             |
+| --------- | ------------------ | -------------------- |
+| `encode`  | 652 ns (+/- 107)   | 1,272 ns (+/- 760)
+| `decode`  | 612 ns (+/- 82)    | 1,187 ns (+/- 541)
+
+Check versions compute or verify the checksum while encoding or decoding the data.
+
+Benchmarks can be found under `/benches` and run with `cargo +nightly bench`.
+
 Release Notes
 ===
 
