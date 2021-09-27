@@ -47,7 +47,18 @@ feature enables async stream for encoding/decoding bytes. This should be used wh
 amount of data or in asyncronous environment. `stream` can be used with `check` to enable
 `encode_stream_check` and `decode_stream_check`.
 
-## About
+Release Notes
+===
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+About
+===
 
 This started as a research project sponsored by TrueLevel SA. It is now maintained by community
 members.
+
+Licensing
+===
+
+The code in this project is licensed under the [MIT License](LICENSE)
