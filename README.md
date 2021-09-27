@@ -3,6 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/base58-monero.svg)](https://crates.io/crates/base58-monero)
 [![Documentation](https://docs.rs/base58-monero/badge.svg)](https://docs.rs/base58-monero)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![MSRV](https://img.shields.io/badge/MSRV-1.45.2-blue)
 
 Rust Monero Base58
 ===
