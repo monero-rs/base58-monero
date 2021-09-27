@@ -128,29 +128,14 @@ pub enum Error {
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            Error::InvalidBlockSize => match other {
-                Error::InvalidBlockSize => true,
-                _ => false,
-            },
-            Error::InvalidSymbol => match other {
-                Error::InvalidSymbol => true,
-                _ => false,
-            },
+            Error::InvalidBlockSize => matches!(other, Error::InvalidBlockSize),
+            Error::InvalidSymbol => matches!(other, Error::InvalidSymbol),
             #[cfg(feature = "check")]
-            Error::InvalidChecksum => match other {
-                Error::InvalidChecksum => true,
-                _ => false,
-            },
-            Error::Overflow => match other {
-                Error::Overflow => true,
-                _ => false,
-            },
+            Error::InvalidChecksum => matches!(other, Error::InvalidChecksum),
+            Error::Overflow => matches!(other, Error::Overflow),
             #[cfg(feature = "stream")]
             // Ignore what Io error is wrapped
-            Error::Io(_) => match other {
-                Error::Io(_) => true,
-                _ => false,
-            },
+            Error::Io(_) => matches!(other, Error::Io(_)),
         }
     }
 }
@@ -433,7 +418,7 @@ pub fn decode_check(data: &str) -> Result<Vec<u8>> {
     };
     let mut check = [0u8; 32];
     let mut hasher = Keccak::v256();
-    hasher.update(&bytes[..]);
+    hasher.update(bytes);
     hasher.finalize(&mut check);
 
     if &check[..CHECKSUM_SIZE] == checksum {
