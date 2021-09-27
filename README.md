@@ -28,7 +28,7 @@ The alphabet is composed of 58 characters visually not similar to avoid confusio
 
 ## Features
 
-If you don't want to include all default features in your project:
+By default both `check` and `stream` features are enabled. If you don't want to include all default features in your project:
 
 ```
 [dependencies.base58-monero]
