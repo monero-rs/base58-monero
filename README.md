@@ -1,4 +1,5 @@
 [![Build Status](https://img.shields.io/github/workflow/status/monero-rs/base58-monero/Build/main)](https://github.com/monero-rs/base58-monero/actions/workflows/build.yml)
+[![Codecov branch](https://img.shields.io/codecov/c/gh/monero-rs/base58-monero/main)](https://app.codecov.io/gh/monero-rs/base58-monero)
 [![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 [![Crates.io](https://img.shields.io/crates/v/base58-monero.svg)](https://crates.io/crates/base58-monero)
 [![Documentation](https://docs.rs/base58-monero/badge.svg)](https://docs.rs/base58-monero)
@@ -27,7 +28,7 @@ The alphabet is composed of 58 characters visually not similar to avoid confusio
 
 ## Features
 
-If you don't want to include all default features in your project:
+By default both `check` and `stream` features are enabled. If you don't want to include all default features in your project:
 
 ```
 [dependencies.base58-monero]
@@ -46,7 +47,18 @@ feature enables async stream for encoding/decoding bytes. This should be used wh
 amount of data or in asyncronous environment. `stream` can be used with `check` to enable
 `encode_stream_check` and `decode_stream_check`.
 
-## About
+Release Notes
+===
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+About
+===
 
 This started as a research project sponsored by TrueLevel SA. It is now maintained by community
 members.
+
+Licensing
+===
+
+The code in this project is licensed under the [MIT License](LICENSE)
