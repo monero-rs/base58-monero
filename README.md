@@ -6,8 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![MSRV](https://img.shields.io/badge/MSRV-1.45.2-blue)
 
-Rust Monero Base58
-===
+# Rust Monero Base58
 
 Library with support for encoding/decoding Monero base58 strings, with and without checksum
 verification.
@@ -52,27 +51,23 @@ amount of data or in asyncronous environment. `stream` can be used with `check` 
 Results obtained on an Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz with a standard Monero address as data source.
 Performances are shown in nanosecond per iteration of compute, the smaller the better:
 
-| Operation | Regular            | `_check`             |
-| --------- | ------------------ | -------------------- |
-| `encode`  | 652 ns (+/- 107)   | 1,272 ns (+/- 760)
-| `decode`  | 612 ns (+/- 82)    | 1,187 ns (+/- 541)
+| Operation | Regular          | `_check`           |
+| --------- | ---------------- | ------------------ |
+| `encode`  | 652 ns (+/- 107) | 1,272 ns (+/- 760) |
+| `decode`  | 612 ns (+/- 82)  | 1,187 ns (+/- 541) |
 
 Check versions compute or verify the checksum while encoding or decoding the data.
 
 Benchmarks can be found under `/benches` and run with `cargo +nightly bench`.
 
-Release Notes
-===
+## Release Notes
 
 See [CHANGELOG.md](CHANGELOG.md).
 
-About
-===
+## About
 
-This started as a research project sponsored by TrueLevel SA. It is now maintained by community
-members.
+This started as a research project sponsored by TrueLevel SA. It is now maintained by community members.
 
-Licensing
-===
+## Licensing
 
 The code in this project is licensed under the [MIT License](LICENSE)

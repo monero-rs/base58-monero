@@ -1,19 +1,19 @@
 [package]
 name = "base58-monero"
-description = "Library with support for encoding/decoding Monero base58 strings."
-keywords = ["monero", "base58", "base58-check"]
 version = "0.3.1"
 authors = ["Monero Rust Contributors", "h4sh3d <h4sh3d@protonmail.com>"]
-license = "MIT"
 documentation = "https://docs.rs/base58-monero"
 homepage = "https://github.com/monero-rs/base58-monero"
-repository = "https://github.com/monero-rs/base58-monero"
-readme = "README.md"
 include = [
-    "src/*",
-    "README.md",
-    "LICENSE",
+  "src/*",
+  "README.md",
+  "LICENSE",
 ]
+keywords = ["monero", "base58", "base58-check"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/monero-rs/base58-monero"
+description = "Library with support for encoding/decoding Monero base58 strings."
 
 edition = "2018"
 
@@ -23,11 +23,11 @@ stream = ["tokio", "async-stream", "futures-util"]
 default = ["check", "stream"]
 
 [dependencies]
-tiny-keccak = { version = "2.0.1", features = ["keccak"], optional = true }
 async-stream = { version = "0.3", optional = true }
-tokio = { version = "1", features = ["io-util"], optional = true }
 futures-util = { version = "0.3.1", optional = true }
 thiserror = "1.0.24"
+tiny-keccak = { version = "2.0.1", features = ["keccak"], optional = true }
+tokio = { version = "1", features = ["io-util"], optional = true }
 
 [dev-dependencies]
 hex = "0.4"
