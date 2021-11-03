@@ -222,7 +222,7 @@ pub fn encode(data: &[u8]) -> Result<String> {
     let full_block_count = data.len() / FULL_BLOCK_SIZE;
     let data: Result<Vec<[char; FULL_ENCODED_BLOCK_SIZE]>> = data
         .chunks(FULL_BLOCK_SIZE)
-        .map(|c| encode_block(c))
+        .map(encode_block)
         .collect();
 
     let mut i = 0;
@@ -359,7 +359,7 @@ pub fn decode(data: &str) -> Result<Vec<u8>> {
     let data: Result<Vec<DecodedBlock>> = data
         .as_bytes()
         .chunks(FULL_ENCODED_BLOCK_SIZE)
-        .map(|c| decode_block(c))
+        .map(decode_block)
         .collect();
     let mut res = Vec::new();
     data?.into_iter().for_each(|c| {
