@@ -220,10 +220,8 @@ fn decode_block(data: &[u8]) -> Result<DecodedBlock> {
 pub fn encode(data: &[u8]) -> Result<String> {
     let last_block_size = ENCODED_BLOCK_SIZES[data.len() % FULL_BLOCK_SIZE];
     let full_block_count = data.len() / FULL_BLOCK_SIZE;
-    let data: Result<Vec<[char; FULL_ENCODED_BLOCK_SIZE]>> = data
-        .chunks(FULL_BLOCK_SIZE)
-        .map(encode_block)
-        .collect();
+    let data: Result<Vec<[char; FULL_ENCODED_BLOCK_SIZE]>> =
+        data.chunks(FULL_BLOCK_SIZE).map(encode_block).collect();
 
     let mut i = 0;
     let mut res: Vec<char> = Vec::new();
