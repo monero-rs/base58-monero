@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Shared workflow to automate release management and publication on [crates.io](https://crates.io) ([#14](https://github.com/monero-rs/base58-monero/pull/14))
 
+### Fixed
+
+- Fix a bug in the condition that validates inputs in `encode_block` and `decode_block` ([#13](https://github.com/monero-rs/base58-monero/pull/13))
+
 ## [0.3.1] - 2021-09-27
 
 ### Changed

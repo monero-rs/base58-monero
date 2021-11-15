@@ -152,7 +152,7 @@ fn u8be_to_u64(data: &[u8]) -> u64 {
 }
 
 fn encode_block(data: &[u8]) -> Result<[char; FULL_ENCODED_BLOCK_SIZE]> {
-    if data.is_empty() && data.len() > FULL_BLOCK_SIZE {
+    if data.is_empty() || data.len() > FULL_BLOCK_SIZE {
         return Err(Error::InvalidBlockSize);
     }
     let mut res = ['1'; FULL_ENCODED_BLOCK_SIZE];
@@ -174,7 +174,7 @@ struct DecodedBlock {
 }
 
 fn decode_block(data: &[u8]) -> Result<DecodedBlock> {
-    if data.is_empty() && data.len() > FULL_ENCODED_BLOCK_SIZE {
+    if data.len() > FULL_ENCODED_BLOCK_SIZE {
         return Err(Error::InvalidBlockSize);
     }
     let res_size = match ENCODED_BLOCK_SIZES.iter().position(|&x| x == data.len()) {
@@ -199,9 +199,7 @@ fn decode_block(data: &[u8]) -> Result<DecodedBlock> {
     let max: u128 = match res_size {
         8 => std::u64::MAX as u128 + 1,
         0..=7 => 1 << (res_size * 8),
-        _ => {
-            return Err(Error::Overflow);
-        }
+        _ => unreachable!(),
     };
 
     let data = if (res as u128) < max {
@@ -255,9 +253,11 @@ where
 
             if len == 0 {
                 // EOF reached, final block is created
-                let block_size = ENCODED_BLOCK_SIZES[clen];
-                for c in &encode_block(&buf[..clen])?[..block_size] {
-                    yield *c;
+                if clen > 0 {
+                    let block_size = ENCODED_BLOCK_SIZES[clen];
+                    for c in &encode_block(&buf[..clen])?[..block_size] {
+                        yield *c;
+                    }
                 }
 
                 break;
@@ -470,7 +470,7 @@ where
 mod tests {
     use super::{
         decode, decode_block, encode, encode_block, u8be_to_u64, Error, ENCODED_BLOCK_SIZES,
-        FULL_BLOCK_SIZE,
+        FULL_BLOCK_SIZE, FULL_ENCODED_BLOCK_SIZE,
     };
 
     #[cfg(feature = "check")]
@@ -482,6 +482,32 @@ mod tests {
 
     #[cfg(feature = "stream")]
     use futures_util::{pin_mut, stream::StreamExt};
+
+    #[test]
+    fn encode_wrong_block() {
+        assert_eq!(encode_block(&[0u8; 0]), Err(Error::InvalidBlockSize));
+        assert_eq!(
+            encode_block(&[0u8; FULL_BLOCK_SIZE + 1]),
+            Err(Error::InvalidBlockSize)
+        );
+    }
+
+    #[test]
+    fn encode_empty_value() {
+        assert_eq!(encode(&[0u8; 0]), Ok(String::from("")));
+    }
+
+    #[test]
+    fn decode_wrong_block() {
+        assert_eq!(decode_block(&[0u8; 1]), Err(Error::InvalidBlockSize));
+        assert_eq!(decode_block(&[0u8; 4]), Err(Error::InvalidBlockSize));
+        assert_eq!(decode_block(&[0u8; 8]), Err(Error::InvalidBlockSize));
+        assert_eq!(
+            decode_block(&[0u8; FULL_ENCODED_BLOCK_SIZE + 1]),
+            Err(Error::InvalidBlockSize)
+        );
+        //assert!(false);
+    }
 
     macro_rules! uint_8be_to_64 {
         ($expected:expr, $string:expr) => {
