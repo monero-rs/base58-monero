@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Shared workflow to automate release management and publication on [crates.io](https://crates.io) ([#14](https://github.com/monero-rs/base58-monero/pull/14))
+
 ## [0.3.1] - 2021-09-27
 
 ### Changed
