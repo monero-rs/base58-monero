@@ -60,9 +60,9 @@ Check versions compute or verify the checksum while encoding or decoding the dat
 
 Benchmarks can be found under `/benches` and run with `cargo +nightly bench`.
 
-## Release Notes
+## Releases and Changelog
 
-See [CHANGELOG.md](CHANGELOG.md).
+See [CHANGELOG.md](CHANGELOG.md) and [RELEASING.md](RELEASING.md).
 
 ## About
 
