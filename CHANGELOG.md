@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Bump MSRV from 1.45.2 to 1.49.0
+- Updating dprint-plugin-markdown 0.11.2 to 0.13.3
+- Updating dprint-plugin-toml 0.5.3 to 0.5.4
 
 ## [0.3.2] - 2021-11-15
 
