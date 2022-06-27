@@ -31,7 +31,7 @@ By default only `check` feature is enabled. If you don't want to include all def
 
 ```toml
 [dependencies.base58-monero]
-version = "0.3"
+version = "1"
 default-features = false
 ```
 
@@ -50,7 +50,7 @@ amount of data or in asyncronous environment. `stream` can be used with `check` 
 
 ```toml
 [dependencies.base58-monero]
-version = "0.3"
+version = "1"
 features = ["stream"]
 ```
 
