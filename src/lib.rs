@@ -35,13 +35,13 @@
 //! Only `check` feature is enabled by default, to remove it use:
 //!
 //! ```text
-//! base58-monero = { version = "0.3", default-features = false }
+//! base58-monero = { version = "1", default-features = false }
 //! ```
 //!
 //! or to enable `stream` one use:
 //!
 //! ```text
-//! base58-monero = { version = "0.3", features = ["stream"] }
+//! base58-monero = { version = "1", features = ["stream"] }
 //! ```
 //!
 //! ## Examples
