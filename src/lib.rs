@@ -32,16 +32,16 @@
 //!  * `check`: enable encoding/decoding base58 strings with a 4 bytes tail checksum.
 //!  * `stream`: enable encoding/decoding base58 asyncronous streams of data.
 //!
-//! Both features are enabled by default, to remove them use:
+//! Only `check` feature is enabled by default, to remove it use:
 //!
 //! ```text
 //! base58-monero = { version = "0.3", default-features = false }
 //! ```
 //!
-//! or to enable only one use:
+//! or to enable `stream` one use:
 //!
 //! ```text
-//! base58-monero = { version = "0.3", default-features = false, features = ["check"] }
+//! base58-monero = { version = "0.3", features = ["stream"] }
 //! ```
 //!
 //! ## Examples

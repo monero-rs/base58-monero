@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Feature `stream` is no longer part of `default` features
+
 ### Changed
 
 - Bump MSRV from 1.45.2 to 1.49.0

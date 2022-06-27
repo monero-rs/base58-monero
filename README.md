@@ -27,9 +27,9 @@ The alphabet is composed of 58 characters visually not similar to avoid confusio
 
 ## Features
 
-By default both `check` and `stream` features are enabled. If you don't want to include all default features in your project:
+By default only `check` feature is enabled. If you don't want to include all default features in your project:
 
-```
+```toml
 [dependencies.base58-monero]
 version = "0.3"
 default-features = false
@@ -41,10 +41,26 @@ Enables `encode_check` and `decode_check` functions. By default `check` feature 
 
 ### `stream`
 
-Enables `encode_stream` and `decode_stream` functions. By default `stream` feature is enable. This
+**This feature is not extensively tested and have performance issues, use it at your own risk!**
+
+Enables `encode_stream` and `decode_stream` functions. By default `stream` feature is not enable. This
 feature enables async stream for encoding/decoding bytes. This should be used when encoding larger
 amount of data or in asyncronous environment. `stream` can be used with `check` to enable
-`encode_stream_check` and `decode_stream_check`.
+`encode_stream_check` and `decode_stream_check`. To use `stream` feature you can add in your Cargo.toml:
+
+```toml
+[dependencies.base58-monero]
+version = "0.3"
+features = ["stream"]
+```
+
+## Tests
+
+Doctests needs `stream` feature to run, run tests with all features:
+
+```
+cargo test --all-features
+```
 
 ## Benchmarks
 

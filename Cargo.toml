@@ -23,7 +23,7 @@ msrv = "1.49.0"
 [features]
 check = ["tiny-keccak"]
 stream = ["tokio", "async-stream", "futures-util"]
-default = ["check", "stream"]
+default = ["check"]
 
 [dependencies]
 async-stream = { version = "0.3", optional = true }
