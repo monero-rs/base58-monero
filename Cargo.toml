@@ -17,6 +17,9 @@ description = "Library with support for encoding/decoding Monero base58 strings.
 
 edition = "2018"
 
+[package.metadata]
+msrv = "1.49.0"
+
 [features]
 check = ["tiny-keccak"]
 stream = ["tokio", "async-stream", "futures-util"]
