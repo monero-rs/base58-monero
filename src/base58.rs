@@ -202,7 +202,7 @@ fn decode_block(data: &[u8]) -> Result<DecodedBlock> {
         _ => unreachable!(),
     };
 
-    let data = if (res as u128) < max {
+    let data = if (res) < max {
         (res as u64).to_be_bytes()
     } else {
         return Err(Error::Overflow);
