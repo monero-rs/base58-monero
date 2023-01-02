@@ -1,4 +1,4 @@
-[![Build Status](https://img.shields.io/github/workflow/status/monero-rs/base58-monero/Build/main)](https://github.com/monero-rs/base58-monero/actions/workflows/build.yml)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/monero-rs/base58-monero/build.yml?branch=main)](https://github.com/monero-rs/base58-monero/actions/workflows/build.yml)
 [![Codecov branch](https://img.shields.io/codecov/c/gh/monero-rs/base58-monero/main)](https://app.codecov.io/gh/monero-rs/base58-monero)
 [![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 [![Crates.io](https://img.shields.io/crates/v/base58-monero.svg)](https://crates.io/crates/base58-monero)
