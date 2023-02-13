@@ -80,15 +80,14 @@ use futures_util::{pin_mut, stream::StreamExt};
 use tiny_keccak::{Hasher, Keccak};
 
 #[cfg(feature = "stream")]
-use tokio::io::AsyncReadExt;
-#[cfg(feature = "stream")]
 use tokio::io;
+#[cfg(feature = "stream")]
+use tokio::io::AsyncReadExt;
 
 extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::num::Wrapping;
-
 
 /// Base58 alphabet, does not contains visualy similar characters
 pub const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -137,6 +136,7 @@ impl core::fmt::Display for Error {
         let message = match self {
             Error::InvalidBlockSize => "Invalid block size error",
             Error::InvalidSymbol => "Invalid symbol error",
+            #[cfg(feature = "check")]
             Error::InvalidChecksum => "Invalid checksum error",
             Error::Overflow => "Overflow error",
             #[cfg(feature = "stream")]
@@ -487,8 +487,6 @@ where
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
