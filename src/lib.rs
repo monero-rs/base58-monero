@@ -81,6 +81,8 @@
 // Coding conventions
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+// Use a no_std environment except for all features except the streaming feature
+#![cfg_attr(not(feature = "stream"), no_std)]
 
 pub mod base58;
 
