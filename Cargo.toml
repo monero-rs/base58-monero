@@ -1,6 +1,6 @@
 [package]
 name = "base58-monero"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Monero Rust Contributors", "h4sh3d <h4sh3d@protonmail.com>"]
 documentation = "https://docs.rs/base58-monero"
 homepage = "https://github.com/monero-rs/base58-monero"
@@ -26,11 +26,10 @@ stream = ["tokio", "async-stream", "futures-util"]
 default = ["check"]
 
 [dependencies]
-async-stream = { version = "0.3", optional = true }
-futures-util = { version = "0.3.1", optional = true }
-thiserror = "1.0.24"
-tiny-keccak = { version = "2.0.1", features = ["keccak"], optional = true }
-tokio = { version = "1", features = ["io-util"], optional = true }
+async-stream = { version = "0.3", optional = true, default-features = false }
+futures-util = { version = "0.3.1", optional = true, default-features = false }
+tiny-keccak = { version = "2.0.1", features = ["keccak"], optional = true, default-features = false }
+tokio = { version = "1", features = ["io-util"], optional = true, default-features = false }
 
 [dev-dependencies]
 hex = "0.4"
