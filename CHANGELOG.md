@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2023-02-20
+
+### Added
+- Implement no_std environment support for all features except streaming
+
+### Removed
+- Set default-features to false
+- Removed unnecessary thiserror package
+
+### Changed
+- Refactored custom Error enum to not depend on thiserror and to only use std for the stream feature
+- Use alloc and core in place of std where possible
+
 ## [1.0.0] - 2022-06-27
 
 ### Removed
@@ -82,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of the library
 
 [Unreleased]: https://github.com/monero-rs/base58-monero/compare/v1.0.0...HEAD
+[1.1.0]: https://github.com/monero-rs/base58-monero/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/monero-rs/base58-monero/compare/v0.3.2...v1.0.0
 [0.3.2]: https://github.com/monero-rs/base58-monero/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/monero-rs/base58-monero/compare/v0.3.0...v0.3.1
