@@ -78,14 +78,16 @@ use futures_util::stream::Stream;
 use futures_util::{pin_mut, stream::StreamExt};
 #[cfg(feature = "check")]
 use tiny_keccak::{Hasher, Keccak};
+
+#[cfg(feature = "stream")]
+use tokio::io;
 #[cfg(feature = "stream")]
 use tokio::io::AsyncReadExt;
 
-use thiserror::Error;
-
-#[cfg(feature = "stream")]
-use std::io;
-use std::num::Wrapping;
+extern crate alloc;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::num::Wrapping;
 
 /// Base58 alphabet, does not contains visualy similar characters
 pub const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -99,21 +101,17 @@ pub const FULL_ENCODED_BLOCK_SIZE: usize = ENCODED_BLOCK_SIZES[FULL_BLOCK_SIZE];
 pub const CHECKSUM_SIZE: usize = 4;
 
 /// Possible errors when encoding/decoding base58 and base58-check strings
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum Error {
     /// Invalid block size, must be `1..=8`
-    #[error("Invalid block size error")]
     InvalidBlockSize,
     /// Symbol not in base58 alphabet
-    #[error("Invalid symbol error")]
     InvalidSymbol,
     /// Invalid 4-bytes checksum
     #[cfg(feature = "check")]
     #[cfg_attr(docsrs, doc(cfg(feature = "check")))]
-    #[error("Invalid checksum error")]
     InvalidChecksum,
     /// Decoding overflow
-    #[error("Overflow error")]
     Overflow,
     /// IO error on stream
     ///
@@ -121,8 +119,32 @@ pub enum Error {
     /// test the wrapped errors.
     #[cfg(feature = "stream")]
     #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
+    Io(io::Error),
+}
+
+// Implementation of the From trait to allow conversion from an io::Error to Error variant Io.
+#[cfg(feature = "stream")]
+impl From<io::Error> for Error {
+    fn from(v: io::Error) -> Self {
+        Self::Io(v)
+    }
+}
+
+// Message to display when Error variants thrown.
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let message = match self {
+            Error::InvalidBlockSize => "Invalid block size error",
+            Error::InvalidSymbol => "Invalid symbol error",
+            #[cfg(feature = "check")]
+            Error::InvalidChecksum => "Invalid checksum error",
+            Error::Overflow => "Overflow error",
+            #[cfg(feature = "stream")]
+            // Ignore what Io error is wrapped
+            Error::Io(_) => "IO error: {0}",
+        };
+        write!(f, "{}", message)
+    }
 }
 
 impl PartialEq for Error {
@@ -141,7 +163,7 @@ impl PartialEq for Error {
 }
 
 /// Utility type for handling results with base58 error type
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 fn u8be_to_u64(data: &[u8]) -> u64 {
     let mut res = 0u64;
@@ -197,7 +219,7 @@ fn decode_block(data: &[u8]) -> Result<DecodedBlock> {
         })?;
 
     let max: u128 = match res_size {
-        8 => std::u64::MAX as u128 + 1,
+        8 => core::u64::MAX as u128 + 1,
         0..=7 => 1 << (res_size * 8),
         _ => unreachable!(),
     };
@@ -468,6 +490,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    extern crate alloc;
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
     use super::{
         decode, decode_block, encode, encode_block, u8be_to_u64, Error, ENCODED_BLOCK_SIZES,
         FULL_BLOCK_SIZE, FULL_ENCODED_BLOCK_SIZE,

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Implement no_std environment support for all features except streaming
+
+### Removed
+
+- Set default-features to false
+- Removed unnecessary thiserror package
+
+### Changed
+
+- Refactored custom Error enum to not depend on thiserror and to only use std for the stream feature
+- Use alloc and core in place of std where possible
+
 ## [1.0.0] - 2022-06-27
 
 ### Removed
