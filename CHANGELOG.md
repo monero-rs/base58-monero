@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New default `std` feature enabling `thiserror` crate to handle `std::error::Error` implementation on `Error` enum
+
 ### Changed
 
 - Rust edition `2021` and MSRV `1.63.0`
+
+### Fixed
+
+- Backward compatibility is guarantee when default features are not disabled in downstream crates
 
 ## [1.1.0] - 2023-03-11
 

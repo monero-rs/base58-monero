@@ -27,13 +27,19 @@ The alphabet is composed of 58 characters visually not similar to avoid confusio
 
 ## Features
 
-By default only `check` feature is enabled. If you don't want to include all default features in your project:
+By default only `check` and `std` features are enabled. If you don't want to include all default
+features in your project:
 
 ```toml
 [dependencies.base58-monero]
 version = "1"
 default-features = false
 ```
+
+### `std`
+
+Disable this feature if you want to build in a `no_std` environment. This feature is required when `steam`
+is enabled.
 
 ### `check`
 
@@ -53,6 +59,8 @@ amount of data or in asyncronous environment. `stream` can be used with `check` 
 version = "1"
 features = ["stream"]
 ```
+
+This feature enables the `std` feature.
 
 ## Tests
 

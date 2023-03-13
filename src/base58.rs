@@ -84,6 +84,9 @@ use tokio::io;
 #[cfg(feature = "stream")]
 use tokio::io::AsyncReadExt;
 
+#[cfg(feature = "std")]
+use thiserror::Error;
+
 extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -102,6 +105,7 @@ pub const CHECKSUM_SIZE: usize = 4;
 
 /// Possible errors when encoding/decoding base58 and base58-check strings
 #[derive(Debug)]
+#[cfg_attr(feature = "std", derive(Error))]
 pub enum Error {
     /// Invalid block size, must be `1..=8`
     InvalidBlockSize,
