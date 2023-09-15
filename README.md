@@ -82,7 +82,11 @@ Performances are shown in nanosecond per iteration of compute, the smaller the b
 
 Check versions compute or verify the checksum while encoding or decoding the data.
 
-Benchmarks can be found under `/benches` and run with `cargo +nightly bench`.
+Benchmarks can be found under `/benches` and run with
+
+```
+cargo +nightly bench --all-features
+```
 
 ## Releases and Changelog
 
