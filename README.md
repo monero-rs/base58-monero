@@ -27,12 +27,12 @@ The alphabet is composed of 58 characters visually not similar to avoid confusio
 
 ## Features
 
-By default only `check` and `std` features are enabled. If you don't want to include all default
+By default only the `std` feature is enabled. If you want to opt-out remove default features
 features in your project:
 
 ```toml
 [dependencies.base58-monero]
-version = "1"
+version = "2"
 default-features = false
 ```
 
@@ -43,7 +43,7 @@ is enabled.
 
 ### `check`
 
-Enables `encode_check` and `decode_check` functions. By default `check` feature is enable.
+Enables `encode_check` and `decode_check` functions. By default `check` feature is disabled.
 
 ### `stream`
 
@@ -56,7 +56,7 @@ amount of data or in asyncronous environment. `stream` can be used with `check` 
 
 ```toml
 [dependencies.base58-monero]
-version = "1"
+version = "2"
 features = ["stream"]
 ```
 

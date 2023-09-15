@@ -33,16 +33,16 @@
 //!  * `check`: enable encoding/decoding base58 strings with a 4 bytes tail checksum.
 //!  * `stream`: enable encoding/decoding base58 asyncronous streams of data.
 //!
-//! Only `check` and `std` features are enabled by default, to remove it use:
+//! Only the `std` feature is enabled by default, to use this crate in `no_std` environment use:
 //!
 //! ```text
-//! base58-monero = { version = "1", default-features = false }
+//! base58-monero = { version = "2", default-features = false }
 //! ```
 //!
 //! or to enable `stream` one use:
 //!
 //! ```text
-//! base58-monero = { version = "1", features = ["stream"] }
+//! base58-monero = { version = "2", features = ["stream"] }
 //! ```
 //!
 //! ## Examples

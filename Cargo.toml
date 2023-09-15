@@ -24,7 +24,7 @@ rust-version = "1.63.0"
 std = ["thiserror"]
 check = ["tiny-keccak"]
 stream = ["std", "tokio", "async-stream", "futures-util"]
-default = ["std", "check"]
+default = ["std"]
 
 [dependencies]
 async-stream = { version = "0.3", optional = true, default-features = false }
