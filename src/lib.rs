@@ -29,10 +29,11 @@
 //!
 //! ## Features
 //!
+//!  * `std`: enable std error implementation on the Error enum.
 //!  * `check`: enable encoding/decoding base58 strings with a 4 bytes tail checksum.
 //!  * `stream`: enable encoding/decoding base58 asyncronous streams of data.
 //!
-//! Only `check` feature is enabled by default, to remove it use:
+//! Only `check` and `std` features are enabled by default, to remove it use:
 //!
 //! ```text
 //! base58-monero = { version = "1", default-features = false }
@@ -81,8 +82,8 @@
 // Coding conventions
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
-// Use a no_std environment except for all features except the streaming feature
-#![cfg_attr(not(feature = "stream"), no_std)]
+// Use a no_std environment when std feature is not enabled
+#![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod base58;
 
