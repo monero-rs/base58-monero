@@ -486,7 +486,7 @@ where
             check[i] = buf[(clen - CHECKSUM_SIZE + i) % len];
         }
 
-        if check != &checksum[..CHECKSUM_SIZE] {
+        if check != checksum[..CHECKSUM_SIZE] {
             Err(Error::InvalidChecksum)?;
         }
     }
