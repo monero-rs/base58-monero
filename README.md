@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/base58-monero.svg)](https://crates.io/crates/base58-monero)
 [![Documentation](https://docs.rs/base58-monero/badge.svg)](https://docs.rs/base58-monero)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![MSRV](https://img.shields.io/badge/MSRV-1.49.0-blue)](https://blog.rust-lang.org/2020/12/31/Rust-1.49.0.html)
+[![MSRV](https://img.shields.io/badge/MSRV-1.63.0-blue)](https://blog.rust-lang.org/2022/08/11/Rust-1.63.0.html)
 
 # Rust Monero Base58
 

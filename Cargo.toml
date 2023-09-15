@@ -15,10 +15,10 @@ readme = "README.md"
 repository = "https://github.com/monero-rs/base58-monero"
 description = "Library with support for encoding/decoding Monero base58 strings."
 
-edition = "2018"
+edition = "2021"
+rust-version = "1.63.0"
 
 [package.metadata]
-msrv = "1.49.0"
 
 [features]
 check = ["tiny-keccak"]
