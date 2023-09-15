@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust edition `2021` and MSRV `1.63.0`
 - `check` feature is disabled by default
 
-## (YANKED) [1.1.0] - 2023-03-11
+## [1.1.0] - 2023-03-11
 
 ### Added
 
