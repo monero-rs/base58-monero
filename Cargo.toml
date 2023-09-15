@@ -1,6 +1,6 @@
 [package]
 name = "base58-monero"
-version = "1.1.0"
+version = "2.0.0"
 authors = ["Monero Rust Contributors", "h4sh3d <h4sh3d@protonmail.com>"]
 documentation = "https://docs.rs/base58-monero"
 homepage = "https://github.com/monero-rs/base58-monero"
