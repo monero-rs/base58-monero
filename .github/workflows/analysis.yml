@@ -37,7 +37,7 @@ jobs:
         components: clippy
 
     - name: Run Clippy
-      run: cargo clippy --workspace --all-targets -- -D warnings
+      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   mdtomlfmt:
     name: Generic format (md,toml)

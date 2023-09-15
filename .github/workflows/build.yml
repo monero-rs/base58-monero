@@ -54,17 +54,17 @@ jobs:
 
     - uses: Swatinem/rust-cache@v2.7.0
 
-    - name: Build with no default features
-      run: cargo build --verbose --no-default-features
+    - name: Base build
+      run: cargo build --verbose
 
     - name: Build with feature 'check'
-      run: cargo build --verbose --no-default-features --features check
+      run: cargo build --verbose --features check
 
     - name: Build with feature 'stream'
-      run: cargo build --verbose --no-default-features --features stream
+      run: cargo build --verbose --features stream
 
     - name: Build full features
-      run: cargo build --verbose
+      run: cargo build --verbose --all-features
 
     - name: Build wasm with check feature
       run: cargo build --verbose --target wasm32-unknown-unknown --no-default-features --features check
