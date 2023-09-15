@@ -469,7 +469,7 @@ where
 
         while let Some(value) = data.next().await {
             buf[clen % len] = value?;
-            if (clen >= CHECKSUM_SIZE) {
+            if clen >= CHECKSUM_SIZE {
                 check[0] = buf[(clen - CHECKSUM_SIZE) % len];
                 hasher.update(&check[0..1]);
                 yield check[0];
