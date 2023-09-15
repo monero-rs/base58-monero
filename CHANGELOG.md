@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Backward compatibility is guarantee when default features are not disabled in downstream crates
 
-## [1.1.0] - 2023-03-11
+## (YANKED) [1.1.0] - 2023-03-11
 
 ### Added
 
