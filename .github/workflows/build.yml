@@ -52,7 +52,7 @@ jobs:
         target: wasm32-unknown-unknown
         profile: minimal
 
-    - uses: Swatinem/rust-cache@v2.7.0
+    - uses: Swatinem/rust-cache@v2.7.1
 
     - name: Base build
       run: cargo build --verbose
@@ -90,6 +90,6 @@ jobs:
         override: true
         profile: minimal
 
-    - uses: Swatinem/rust-cache@v2.7.0
+    - uses: Swatinem/rust-cache@v2.7.1
 
     - run: cargo test --verbose --all-features
