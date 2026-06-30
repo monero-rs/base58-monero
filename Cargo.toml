@@ -16,7 +16,7 @@ repository = "https://github.com/monero-rs/base58-monero"
 description = "Library with support for encoding/decoding Monero base58 strings."
 
 edition = "2021"
-rust-version = "1.63.0"
+rust-version = "1.71.0"
 
 [package.metadata]
 
@@ -29,7 +29,7 @@ default = ["std"]
 [dependencies]
 async-stream = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3.1", optional = true, default-features = false }
-thiserror = { version = "1", optional = true }
+thiserror = { version = "2", optional = true }
 tiny-keccak = { version = "2.0.1", features = ["keccak"], optional = true, default-features = false }
 tokio = { version = "1", features = ["io-util"], optional = true, default-features = false }
 

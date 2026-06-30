@@ -223,7 +223,7 @@ fn decode_block(data: &[u8]) -> Result<DecodedBlock> {
         })?;
 
     let max: u128 = match res_size {
-        8 => core::u64::MAX as u128 + 1,
+        8 => u64::MAX as u128 + 1,
         0..=7 => 1 << (res_size * 8),
         _ => unreachable!(),
     };
